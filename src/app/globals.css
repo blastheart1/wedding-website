@@ -17,9 +17,10 @@ body {
   font-family: var(--font-jost);
   background-color: #FDFAF6;
   color: #2E1F1A;
-  /* overflow-x on body (not html) — overflow on html breaks position:sticky
-     (e.g. gallery scroll stack) in several browsers */
-  overflow-x: hidden;
+  /* overflow-x: clip does NOT create a scroll container (unlike hidden),
+     so position:fixed stays relative to the viewport and position:sticky
+     still works correctly in all browsers */
+  overflow-x: clip;
 }
 
 /* ─── Typography utilities ─────────────────────────────────────────────── */

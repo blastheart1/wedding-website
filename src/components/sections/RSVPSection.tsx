@@ -6,7 +6,6 @@ import { zodResolver }    from '@hookform/resolvers/zod'
 import { z }              from 'zod'
 import { toast }          from 'sonner'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
-import { SectionHeader }  from '@/components/ui/SectionHeader'
 import { MEAL_OPTIONS }   from '@/lib/constants'
 import type { PublicConfig } from '@/lib/config'
 import { fadeUp, stagger }   from '@/lib/animations'
@@ -30,13 +29,13 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 const inputClass = clsx(
-  'w-full px-[14px] py-3 bg-cream border border-rule',
+  'w-full px-[14px] py-[9px] bg-cream border border-rule',
   'font-sans text-[14px] text-ink outline-none',
   'transition-colors focus:border-rose focus:bg-white',
   'appearance-none rounded-none',
 )
 
-const labelClass = 'block text-[9px] tracking-[3px] uppercase text-muted mb-2'
+const labelClass = 'block text-[9px] tracking-[3px] uppercase text-muted mb-1'
 
 export function RSVPSection({ config }: RSVPSectionProps) {
   const { rsvpDeadline, partner1, partner2, weddingDate } = config
@@ -78,15 +77,18 @@ export function RSVPSection({ config }: RSVPSectionProps) {
     }
   }
 
-  // Format wedding date for display
   const [year, month, day] = weddingDate.split('-').map(Number)
   const formattedDate = new Date(year, month - 1, day).toLocaleDateString('en-US', {
     month: 'long', day: 'numeric', year: 'numeric',
   })
 
   return (
-    <section id="rsvp" className="bg-petal py-24 px-6 border-t border-blush">
-      <SectionHeader eyebrow="You're Invited" heading="Will you" headingItalic="join us?" />
+    <section id="rsvp" className="bg-petal border-t border-blush min-h-screen flex flex-col items-center justify-center px-6 py-8">
+      <div className="w-full">
+      <p className="text-[9px] tracking-[4px] uppercase text-muted text-center mb-2">You&apos;re invited</p>
+      <h2 className="font-display font-light text-[28px] text-center mb-2">
+        Will you <em className="italic text-rose">join us?</em>
+      </h2>
 
       {rsvpDeadline && (
         <motion.p
@@ -94,7 +96,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
           variants={fadeUp}
           initial="hidden"
           animate={inView ? 'visible' : 'hidden'}
-          className="text-center text-[11px] tracking-[2px] uppercase text-muted mb-8 -mt-6"
+          className="text-center text-[11px] tracking-[2px] uppercase text-muted mb-3"
         >
           Please RSVP by {rsvpDeadline}
         </motion.p>
@@ -104,7 +106,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
         variants={stagger(0.1)}
         initial="hidden"
         animate={inView ? 'visible' : 'hidden'}
-        className="max-w-[480px] mx-auto bg-white border border-rule p-12"
+        className="max-w-[460px] mx-auto bg-white border border-rule p-5"
       >
         <AnimatePresence mode="wait">
           {submittedData ? (
@@ -136,7 +138,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
             <motion.form
               key="form"
               onSubmit={handleSubmit(onSubmit)}
-              className="space-y-5"
+              className="space-y-3"
               variants={stagger(0.06)}
               initial="hidden"
               animate="visible"
@@ -169,7 +171,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{    opacity: 0, height: 0 }}
                     transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                    className="space-y-5 overflow-hidden"
+                    className="space-y-3 overflow-hidden"
                   >
                     <div>
                       <label className={labelClass}>Meal Preference</label>
@@ -224,7 +226,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
                 <label className={labelClass}>Message for {partner1} & {partner2}</label>
                 <textarea
                   {...register('message')}
-                  className={clsx(inputClass, 'min-h-[80px] resize-y')}
+                  className={clsx(inputClass, 'min-h-[48px] resize-y')}
                   placeholder="Wishes, love notes…"
                 />
               </motion.div>
@@ -235,7 +237,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
                 disabled={isSubmitting}
                 whileHover={{ scale: 1.01 }}
                 whileTap={{  scale: 0.99 }}
-                className="w-full bg-rose text-white text-[10px] tracking-[3px] uppercase font-medium py-4 hover:bg-rosedark disabled:opacity-60 transition-colors mt-2"
+                className="w-full bg-rose text-white text-[10px] tracking-[3px] uppercase font-medium py-3 hover:bg-rosedark disabled:opacity-60 transition-colors"
               >
                 {isSubmitting ? 'Sending…' : 'Send RSVP'}
               </motion.button>
@@ -243,6 +245,7 @@ export function RSVPSection({ config }: RSVPSectionProps) {
           )}
         </AnimatePresence>
       </motion.div>
+      </div>
     </section>
   )
 }

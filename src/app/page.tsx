@@ -6,7 +6,12 @@ import { Details }     from '@/components/sections/Details'
 import { Gallery }     from '@/components/sections/Gallery'
 import { RSVPSection } from '@/components/sections/RSVPSection'
 import { Footer }      from '@/components/sections/Footer'
-import { FloralBand, FloralPop } from '@/components/ui/FloralDivider'
+import {
+  FlowersBox,
+  HERO_FLOWERS,
+  STORY_FLOWERS,
+  COUNTDOWN_FLOWERS,
+} from '@/components/ui/FlowersBox'
 import { getWeddingConfig } from '@/lib/config'
 
 export const dynamic = 'force-dynamic'
@@ -17,20 +22,29 @@ export default async function Home() {
   return (
     <main>
       <Navbar config={config} />
-      <Hero   config={config} />
 
-      <FloralBand height={130} />
+      {/* Hero — flowers at the bottom edges, each pops in independently on scroll */}
+      <div className="relative overflow-visible">
+        <Hero config={config} />
+        <FlowersBox flowers={HERO_FLOWERS} />
+      </div>
 
-      <Story bgUrl={config.storyBgUrl || undefined} />
+      {/* Story — flowers visible at bottom while scrolling through */}
+      <div className="relative overflow-visible">
+        <Story bgUrl={config.storyBgUrl || undefined} />
+        <FlowersBox flowers={STORY_FLOWERS} />
+      </div>
 
-      <FloralPop className="bg-petal" />
+      {/* Countdown — flowers at bottom edges */}
+      <div className="relative overflow-visible">
+        <Countdown config={config} bgUrl={config.countdownBgUrl || undefined} />
+        <FlowersBox flowers={COUNTDOWN_FLOWERS} />
+      </div>
 
-      <Countdown config={config} bgUrl={config.countdownBgUrl || undefined} />
-      <Details   config={config} bgUrl={config.detailsBgUrl   || undefined} />
-
-      <FloralBand height={130} />
+      <Details config={config} bgUrl={config.detailsBgUrl || undefined} />
 
       <Gallery bgUrl={config.galleryBgUrl || undefined} />
+
       <RSVPSection config={config} />
       <Footer config={config} />
     </main>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  motion, useScroll, useTransform, AnimatePresence,
+  motion, useScroll, useTransform, useSpring, useInView, AnimatePresence,
   type MotionValue,
 } from 'framer-motion'
 import { SectionHeader }    from '@/components/ui/SectionHeader'
@@ -11,6 +11,75 @@ import { SectionBackground } from '@/components/ui/SectionBackground'
 import { fadeIn }            from '@/lib/animations'
 import type { GalleryPhotoData } from '@/types'
 import clsx from 'clsx'
+
+// ─── Gallery flower overlay — fixed-position, scroll-driven ──────────────────
+// Each flower pops in at a different scrollYProgress threshold so they
+// appear one-by-one as the user scrolls through the instax stack.
+const GALLERY_OVERLAY_FLOWERS = [
+  { src: '/flowers/home-petals-left.png',   style: { left: '1vw',   bottom: '22vh', width: 'clamp(90px,11vw,160px)'  }, threshold: [0.12, 0.18] as [number,number], rotate: -8  },
+  { src: '/flowers/s2-flower-right.png',    style: { right: '1vw',  bottom: '28vh', width: 'clamp(100px,13vw,180px)' }, threshold: [0.28, 0.34] as [number,number], rotate: 10  },
+  { src: '/flowers/s2-lily-right.png',      style: { right: '2vw',  bottom: '8vh',  width: 'clamp(110px,14vw,200px)' }, threshold: [0.44, 0.50] as [number,number], rotate: -6  },
+  { src: '/flowers/s3-flower-left.png',     style: { left: '2vw',   bottom: '10vh', width: 'clamp(100px,13vw,185px)' }, threshold: [0.60, 0.66] as [number,number], rotate: 7   },
+  { src: '/flowers/s2-petals-right.png',    style: { right: '3vw',  bottom: '44vh', width: 'clamp(70px, 9vw, 130px)' }, threshold: [0.74, 0.80] as [number,number], rotate: -10 },
+  { src: '/flowers/home-flowers-left.png',  style: { left: '-4.5vw', bottom: '38vh', width: 'clamp(110px,15vw,200px)' }, threshold: [0.84, 0.90] as [number,number], rotate: 5   },
+]
+
+function GalleryFlowers({
+  scrollYProgress,
+  scrollOffscreen,
+  stickyEndFraction,
+}: {
+  scrollYProgress:   MotionValue<number>
+  // tracks 0→1 as the entire section scrolls from entering to fully above viewport
+  scrollOffscreen:   MotionValue<number>
+  // fraction of scrollOffscreen at which the sticky phase ends (~total/(total+1))
+  stickyEndFraction: number
+}) {
+  // After the sticky phase the section scrolls up — flowers must follow in lockstep.
+  // No spring here: we want pixel-perfect sync with the section leaving the viewport.
+  // scrollOffscreen goes stickyEndFraction→1 as the section scrolls exactly 1vh off-screen.
+  const exitY = useTransform(scrollOffscreen, [stickyEndFraction, 1.0], ['0vh', '-110vh'])
+
+  return (
+    <>
+      {GALLERY_OVERLAY_FLOWERS.map((f, i) => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const rawOpacity = useTransform(scrollYProgress, f.threshold, [0, 1])
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const opacity    = useSpring(rawOpacity, { stiffness: 120, damping: 20 })
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const scale      = useTransform(rawOpacity, [0, 1], [0.72, 1])
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const rotate     = useTransform(rawOpacity, [0, 1], [f.rotate * 2, 0])
+
+        return (
+          <motion.div
+            key={i}
+            style={{
+              position: 'fixed',
+              pointerEvents: 'none',
+              zIndex: 5,
+              opacity,
+              scale,
+              rotate,
+              y: exitY,  // sweep upward in lockstep with the section
+              ...f.style,
+            }}
+          >
+            <Image
+              src={f.src}
+              alt="Decorative flower"
+              width={300}
+              height={300}
+              style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+              priority={false}
+            />
+          </motion.div>
+        )
+      })}
+    </>
+  )
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const ROTATIONS = [-4, 3, -2.5, 5, -1.5, 3.5, -3, 2, -5, 4, -2, 3.5]
@@ -115,15 +184,15 @@ function ScrollHint({ scrollYProgress }: { scrollYProgress: MotionValue<number> 
   return (
     <motion.div
       style={{ opacity }}
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-20"
+      className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-20"
     >
       <motion.div
-        animate={{ y: [0, 6, 0] }}
+        animate={{ y: [0, 8, 0] }}
         transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
         className="flex flex-col items-center gap-2"
       >
-        <div className="w-px h-8 bg-ink/20" />
-        <span className="text-[9px] tracking-[3px] uppercase text-muted">Scroll to stack</span>
+        <div className="w-px h-11 bg-ink/20" />
+        <span className="text-[12px] tracking-[4px] uppercase text-muted">Scroll to stack</span>
       </motion.div>
     </motion.div>
   )
@@ -144,7 +213,7 @@ function StackProgress({
     { clamp: true },
   )
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-24 h-px bg-ink/10 z-20">
+    <div className="absolute bottom-7 left-1/2 -translate-x-1/2 w-32 h-[2px] bg-ink/10 z-20">
       <motion.div style={{ width }} className="h-full bg-rose/60" />
     </div>
   )
@@ -165,10 +234,21 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
   }, [])
 
   const trackRef = useRef<HTMLElement>(null)
+
+  // 0→1 during the sticky phase only (end end = section bottom at viewport bottom)
   const { scrollYProgress } = useScroll({
     target: trackRef,
     offset: ['start start', 'end end'],
   })
+
+  // 0→1 from section entering to completely scrolled above viewport (end start)
+  // This covers both the sticky phase AND the post-sticky natural scroll.
+  const { scrollYProgress: scrollOffscreen } = useScroll({
+    target: trackRef,
+    offset: ['start start', 'end start'],
+  })
+
+  const bottleInView = useInView(trackRef, { once: true, amount: 0.05 })
 
   const hasPhotos = !loading && photos.length > 0
   // Show at most 10 photos in the stack; beyond that still loads in gallery grid
@@ -182,6 +262,13 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
 
   return (
     <>
+      {/* Fixed flower overlays — appear one-by-one, exit with the section */}
+      <GalleryFlowers
+        scrollYProgress={scrollYProgress}
+        scrollOffscreen={scrollOffscreen}
+        stickyEndFraction={total / (total + 1)}
+      />
+
       {/*
        * ── Sticky scroll stack ──────────────────────────────────────────────
        *
@@ -200,6 +287,23 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
       >
         <div className="sticky top-0 h-[100svh] min-h-0 relative flex flex-col overflow-hidden">
           <SectionBackground imageUrl={bgUrl} fallbackColor="bg-sage" overlayClass="bg-white/20" />
+
+          {/* Champagne bottle — lower-left, behind all instax cards (z-index 0) */}
+          <motion.div
+            initial={{ opacity: 0, x: -80, y: 40, rotate: -18 }}
+            animate={bottleInView ? { opacity: 1, x: 0, y: 0, rotate: -6 } : {}}
+            transition={{ duration: 1.0, delay: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+            style={{ position: 'absolute', bottom: '-18%', left: '-12%', width: 'clamp(780px, 120vw, 1400px)', zIndex: 0 }}
+          >
+            <Image
+              src="/champagne-bottle.png"
+              alt="Champagne bottle"
+              width={600}
+              height={1000}
+              style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+            />
+          </motion.div>
+
           {/* Section header — visible at top of sticky viewport */}
           <div className="relative z-10 shrink-0 pt-16 pb-4">
             <SectionHeader

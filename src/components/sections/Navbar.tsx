@@ -13,6 +13,9 @@ interface NavbarProps {
 export function Navbar({ config }: NavbarProps) {
   const [scrolled,   setScrolled]   = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [atTop,      setAtTop]      = useState(true)
+  const [inGallery,  setInGallery]  = useState(false)
+  const [idle,       setIdle]       = useState(false)
 
   useEffect(() => {
     const handler = () => {
@@ -28,6 +31,52 @@ export function Navbar({ config }: NavbarProps) {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  useEffect(() => {
+    setAtTop(window.scrollY === 0)
+    const handler = () => {
+      setAtTop(window.scrollY === 0)
+    }
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => window.removeEventListener('scroll', handler)
+  }, [])
+
+  useEffect(() => {
+    const galleryEl = document.getElementById('gallery')
+    if (!galleryEl) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setInGallery(entry.isIntersecting)
+      },
+      { threshold: 0.15 },
+    )
+    observer.observe(galleryEl)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+
+    if (window.scrollY > 0) {
+      timer = setTimeout(() => setIdle(true), 3000)
+    }
+
+    const handler = () => {
+      if (timer) clearTimeout(timer)
+      setIdle(false)
+      if (window.scrollY > 0) {
+        timer = setTimeout(() => setIdle(true), 3000)
+      }
+    }
+
+    window.addEventListener('scroll', handler, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', handler)
+      if (timer) clearTimeout(timer)
+    }
+  }, [])
+
+  const navHidden = !atTop && (inGallery || idle)
 
   const initials = `${config.partner1[0]} & ${config.partner2[0]}`
   const navLinks = NAV_LINKS.filter(l => l.href !== '#rsvp')
@@ -70,9 +119,10 @@ export function Navbar({ config }: NavbarProps) {
       >
         {/* ── Animated pill — only y/opacity, no transform classes ─────── */}
         <motion.nav
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, y: -20 }}
+          animate={navHidden ? { opacity: 0, y: -20 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{ pointerEvents: navHidden ? 'none' : 'auto' }}
           className={clsx(
             'w-full flex items-center px-4 md:px-5 py-[10px] rounded-full',
             'border border-rule transition-all duration-300',

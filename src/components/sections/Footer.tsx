@@ -29,7 +29,7 @@ export function Footer({ config }: FooterProps) {
   const inView = useInView(ref, { once: true, margin: '-40px' })
 
   return (
-    <footer className="bg-ink text-white text-center py-16 px-6 overflow-hidden">
+    <footer className="bg-ink text-white text-center px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
       <motion.div
         ref={ref}
         variants={stagger(0.12, 0)}
