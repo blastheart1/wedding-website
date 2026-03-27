@@ -16,9 +16,10 @@ export default function AdminLoginPage() {
     setError('')
     try {
       const res = await fetch('/api/admin/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ password: pw }),
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ password: pw }),
       })
       if (res.ok) {
         router.push('/admin')

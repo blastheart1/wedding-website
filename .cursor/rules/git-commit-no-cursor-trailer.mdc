@@ -1,0 +1,21 @@
+---
+description: Do not add Cursor or co-author trailers to git commits
+alwaysApply: true
+---
+
+# Git commits
+
+When running `git commit`, do **not** use:
+
+- `--trailer "Made-with: Cursor"`
+- Any other `--trailer` that attributes the commit to Cursor or an assistant
+
+Use a plain message only, for example:
+
+```bash
+git commit -m "Short imperative subject line"
+```
+
+If a multi-line body is needed, use `-m` twice or a here-doc — still **without** `--trailer`.
+
+Do not pass `-m` together with `--trailer` for Cursor branding.

@@ -8,7 +8,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { RSVP, WeddingConfig, GalleryPhoto } from '@/lib/schema'
 import clsx from 'clsx'
 
-// Cookies are sent automatically on same-origin fetch — no password threading needed.
+/** Ensures the httpOnly admin session cookie is always sent (some browsers / embeds omit it otherwise). */
+const cred: RequestCredentials = 'include'
 
 export function AdminPanel() {
   const router = useRouter()
@@ -18,7 +19,7 @@ export function AdminPanel() {
   const [stats,  setStats]  = useState({ total: 0, attending: 0, declining: 0 })
 
   const fetchData = useCallback(async () => {
-    const res  = await fetch('/api/admin')
+    const res  = await fetch('/api/admin', { credentials: cred })
     const json = await res.json()
     if (res.ok) {
       setRsvps(json.rsvps   ?? [])
@@ -34,9 +35,10 @@ export function AdminPanel() {
 
   const saveConfig = async () => {
     const res = await fetch('/api/admin', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(config),
+      method:      'POST',
+      credentials: cred,
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify(config),
     })
     if (res.ok) {
       toast.success('Settings saved!')
@@ -48,7 +50,7 @@ export function AdminPanel() {
 
   const exportExcel = async () => {
     try {
-      const res = await fetch('/api/admin/export')
+      const res = await fetch('/api/admin/export', { credentials: cred })
       if (!res.ok) { toast.error('Export failed'); return }
       const blob = await res.blob()
       const url  = URL.createObjectURL(blob)
@@ -65,7 +67,7 @@ export function AdminPanel() {
   }
 
   const logout = async () => {
-    await fetch('/api/admin/logout', { method: 'POST' })
+    await fetch('/api/admin/logout', { method: 'POST', credentials: cred })
     router.push('/admin/login')
   }
 
@@ -268,6 +270,7 @@ function RSVPsTab({ rsvps, stats, onExport }: {
 
 // ─── Gallery tab ──────────────────────────────────────────────────────────────
 function GalleryTab() {
+  const router = useRouter()
   const [photos,    setPhotos]    = useState<GalleryPhoto[]>([])
   const [uploading, setUploading] = useState(false)
   const [caption,   setCaption]   = useState('')
@@ -276,7 +279,7 @@ function GalleryTab() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const loadPhotos = useCallback(async () => {
-    const res  = await fetch('/api/admin/gallery')
+    const res  = await fetch('/api/admin/gallery', { credentials: cred })
     const json = await res.json()
     setPhotos(json.photos ?? [])
   }, [])
@@ -291,10 +294,20 @@ function GalleryTab() {
       const paramsToSign = { timestamp: String(timestamp), folder }
 
       const signRes = await fetch('/api/admin/gallery/sign', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ paramsToSign }),
+        method:      'POST',
+        credentials: cred,
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({ paramsToSign }),
       })
+      if (!signRes.ok) {
+        if (signRes.status === 401) {
+          toast.error('Session expired — please log in again')
+          router.push('/admin/login')
+        } else {
+          toast.error('Could not authorize upload')
+        }
+        return
+      }
       const { signature, apiKey, cloudName } = await signRes.json() as {
         signature: string; apiKey: string; cloudName: string
       }
@@ -306,23 +319,44 @@ function GalleryTab() {
       form.append('timestamp', String(timestamp))
       form.append('folder',    folder)
 
-      const uploadRes  = await fetch(
+      const uploadRes = await fetch(
         `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
         { method: 'POST', body: form },
       )
-      const uploadData = await uploadRes.json() as { secure_url: string; public_id: string }
+      const uploadData = await uploadRes.json() as {
+        secure_url?: string
+        public_id?: string
+        error?:    { message?: string }
+      }
 
-      if (!uploadData.secure_url) throw new Error('Upload failed')
+      if (!uploadRes.ok || !uploadData.secure_url) {
+        const cloudErr =
+          uploadData.error?.message
+          ?? (uploadRes.status === 401
+            ? 'Invalid Cloudinary credentials or signature — check CLOUDINARY_* env vars on the server'
+            : `Upload failed (${uploadRes.status})`)
+        throw new Error(cloudErr)
+      }
 
-      await fetch('/api/admin/gallery', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({
+      const saveRes = await fetch('/api/admin/gallery', {
+        method:      'POST',
+        credentials: cred,
+        headers:     { 'Content-Type': 'application/json' },
+        body:        JSON.stringify({
           url:      uploadData.secure_url,
           publicId: uploadData.public_id,
           caption:  caption.trim() || undefined,
         }),
       })
+      if (!saveRes.ok) {
+        if (saveRes.status === 401) {
+          toast.error('Session expired — please log in again')
+          router.push('/admin/login')
+        } else {
+          toast.error('Could not save photo to gallery')
+        }
+        return
+      }
 
       toast.success('Photo uploaded!')
       setCaption('')
@@ -338,16 +372,17 @@ function GalleryTab() {
 
   const deletePhoto = async (id: number) => {
     if (!confirm('Remove this photo?')) return
-    await fetch(`/api/admin/gallery?id=${id}`, { method: 'DELETE' })
+    await fetch(`/api/admin/gallery?id=${id}`, { method: 'DELETE', credentials: cred })
     setPhotos(prev => prev.filter(p => p.id !== id))
     toast.success('Photo removed')
   }
 
   const saveCaption = async (id: number) => {
     await fetch('/api/admin/gallery', {
-      method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ id, caption: editCap }),
+      method:      'PATCH',
+      credentials: cred,
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify({ id, caption: editCap }),
     })
     setPhotos(prev => prev.map(p => p.id === id ? { ...p, caption: editCap } : p))
     setEditId(null)
