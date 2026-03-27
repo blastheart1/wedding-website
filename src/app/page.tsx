@@ -21,16 +21,16 @@ export default async function Home() {
 
       <FloralBand height={130} />
 
-      <Story />
+      <Story bgUrl={config.storyBgUrl || undefined} />
 
       <FloralPop className="bg-petal" />
 
-      <Countdown   config={config} />
-      <Details     config={config} />
+      <Countdown config={config} bgUrl={config.countdownBgUrl || undefined} />
+      <Details   config={config} bgUrl={config.detailsBgUrl   || undefined} />
 
       <FloralBand height={130} />
 
-      <Gallery />
+      <Gallery bgUrl={config.galleryBgUrl || undefined} />
       <RSVPSection config={config} />
       <Footer config={config} />
     </main>

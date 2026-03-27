@@ -5,9 +5,11 @@ import { motion, useInView, AnimatePresence } from 'framer-motion'
 import type { CountdownValues } from '@/types'
 import type { PublicConfig }    from '@/lib/config'
 import { SectionHeader }        from '@/components/ui/SectionHeader'
+import { SectionBackground }    from '@/components/ui/SectionBackground'
 
 interface CountdownProps {
   config: Pick<PublicConfig, 'weddingDate' | 'ceremonyTime'>
+  bgUrl?: string
 }
 
 function getTimeLeft(weddingDate: string, ceremonyTime: string): CountdownValues {
@@ -54,7 +56,7 @@ function FlipDigit({ value }: { value: string }) {
   )
 }
 
-export function Countdown({ config }: CountdownProps) {
+export function Countdown({ config, bgUrl }: CountdownProps) {
   const { weddingDate, ceremonyTime } = config
 
   const [values, setValues] = useState<CountdownValues>(() =>
@@ -82,8 +84,10 @@ export function Countdown({ config }: CountdownProps) {
   return (
     <section
       id="countdown"
-      className="bg-lavender py-28 px-6 text-center border-y border-lilac/20"
+      className="relative py-28 px-6 text-center border-y border-lilac/20"
     >
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender" />
+      <div className="relative z-10">
       <SectionHeader eyebrow="Counting down" heading="Until we say" headingItalic="forever" />
 
       <motion.div
@@ -119,6 +123,7 @@ export function Countdown({ config }: CountdownProps) {
           </motion.div>
         ))}
       </motion.div>
+      </div>
     </section>
   )
 }

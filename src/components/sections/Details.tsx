@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion'
 import type { PublicConfig } from '@/lib/config'
 import { SectionHeader }     from '@/components/ui/SectionHeader'
 import { stagger, fadeUp }   from '@/lib/animations'
+import { SectionBackground } from '@/components/ui/SectionBackground'
 
 interface DetailsProps {
   config: Pick<
@@ -14,6 +15,7 @@ interface DetailsProps {
     | 'dressCode' | 'hotelName' | 'hotelCode' | 'hotelDiscount'
     | 'guestNotes'
   >
+  bgUrl?: string
 }
 
 function formatWeddingDate(dateStr: string): string {
@@ -34,7 +36,7 @@ function Line({ text }: { text: string }) {
   return <p>{text}</p>
 }
 
-export function Details({ config }: DetailsProps) {
+export function Details({ config, bgUrl }: DetailsProps) {
   const {
     weddingDate, ceremonyTime, receptionTime,
     ceremonyVenue, receptionVenue, location,
@@ -95,7 +97,9 @@ export function Details({ config }: DetailsProps) {
   const inView = useInView(ref, { once: true, margin: '-60px' })
 
   return (
-    <section id="details" className="bg-cream py-24 px-6">
+    <section id="details" className="relative py-24 px-6">
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream" />
+      <div className="relative z-10">
       <SectionHeader eyebrow="Event Details" heading="Mark your" headingItalic="calendar" />
 
       <motion.div
@@ -139,6 +143,7 @@ export function Details({ config }: DetailsProps) {
           </motion.div>
         ))}
       </motion.div>
+      </div>
     </section>
   )
 }

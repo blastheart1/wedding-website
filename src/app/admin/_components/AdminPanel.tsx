@@ -5,15 +5,32 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { toast }    from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { RSVP, WeddingConfig, GalleryPhoto } from '@/lib/schema'
 import clsx from 'clsx'
 
-/** Ensures the httpOnly admin session cookie is always sent (some browsers / embeds omit it otherwise). */
+/** Ensures the httpOnly admin session cookie is always sent. */
 const cred: RequestCredentials = 'include'
+
+type Tab = 'settings' | 'rsvps' | 'gallery' | 'story'
 
 export function AdminPanel() {
   const router = useRouter()
-  const [tab,    setTab]    = useState<'settings' | 'rsvps' | 'gallery'>('settings')
+  const [tab,    setTab]    = useState<Tab>('settings')
   const [rsvps,  setRsvps]  = useState<RSVP[]>([])
   const [config, setConfig] = useState<Partial<WeddingConfig>>({})
   const [stats,  setStats]  = useState({ total: 0, attending: 0, declining: 0 })
@@ -71,12 +88,19 @@ export function AdminPanel() {
     router.push('/admin/login')
   }
 
-  const tabClass = (t: string) => clsx(
+  const tabClass = (t: Tab) => clsx(
     'px-5 py-2 text-[10px] tracking-[2px] uppercase border transition-colors cursor-pointer',
     tab === t
       ? 'bg-rose text-white border-rose'
       : 'bg-white text-muted border-rule hover:bg-petal',
   )
+
+  const TAB_LABELS: Record<Tab, string> = {
+    settings: 'Settings',
+    rsvps:    `RSVPs (${stats.total})`,
+    gallery:  'Gallery',
+    story:    'Story',
+  }
 
   return (
     <div className="min-h-screen bg-cream p-6">
@@ -87,9 +111,9 @@ export function AdminPanel() {
           <p className="text-[12px] text-muted mt-1">Wedding management</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {(['settings', 'rsvps', 'gallery'] as const).map(t => (
+          {(['settings', 'rsvps', 'gallery', 'story'] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={tabClass(t)}>
-              {t === 'settings' ? 'Settings' : t === 'rsvps' ? `RSVPs (${stats.total})` : 'Gallery'}
+              {TAB_LABELS[t]}
             </button>
           ))}
           <button
@@ -109,6 +133,9 @@ export function AdminPanel() {
       )}
       {tab === 'gallery' && (
         <GalleryTab />
+      )}
+      {tab === 'story' && (
+        <StoryTab />
       )}
     </div>
   )
@@ -180,7 +207,130 @@ function SettingsTab({
         </div>
         <SaveButton onSave={onSave} />
       </Card>
+      <SectionBgCard config={config} setConfig={setConfig} onSave={onSave} />
     </div>
+  )
+}
+
+// ─── Section background image upload card ────────────────────────────────────
+const BG_SECTIONS = [
+  { key: 'heroBgUrl'      as keyof WeddingConfig, label: 'Hero',      hint: 'Used when no video is set' },
+  { key: 'storyBgUrl'     as keyof WeddingConfig, label: 'Story',     hint: '"A Story Worth Telling" section' },
+  { key: 'countdownBgUrl' as keyof WeddingConfig, label: 'Countdown', hint: 'Behind the flip-clock numbers' },
+  { key: 'detailsBgUrl'   as keyof WeddingConfig, label: 'Details',   hint: 'Event details section' },
+  { key: 'galleryBgUrl'   as keyof WeddingConfig, label: 'Gallery',   hint: 'Behind the photo stack' },
+]
+
+function SectionBgCard({
+  config, setConfig, onSave,
+}: {
+  config:    Partial<WeddingConfig>
+  setConfig: (c: Partial<WeddingConfig>) => void
+  onSave:    () => void
+}) {
+  const router = useRouter()
+  const [uploading, setUploading] = useState<string | null>(null)
+
+  const uploadBg = async (sectionKey: keyof WeddingConfig, file: File) => {
+    setUploading(sectionKey)
+    try {
+      const timestamp    = Math.round(Date.now() / 1000)
+      const folder       = 'wedding/backgrounds'
+      const paramsToSign = { timestamp: String(timestamp), folder }
+
+      const signRes = await fetch('/api/admin/gallery/sign', {
+        method: 'POST', credentials: cred,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paramsToSign }),
+      })
+      if (!signRes.ok) {
+        if (signRes.status === 401) { toast.error('Session expired'); router.push('/admin/login') }
+        else toast.error('Could not sign upload')
+        return
+      }
+      const { signature, apiKey, cloudName } = await signRes.json() as {
+        signature: string; apiKey: string; cloudName: string
+      }
+
+      const form = new FormData()
+      form.append('file', file)
+      form.append('signature', signature)
+      form.append('api_key', apiKey)
+      form.append('timestamp', String(timestamp))
+      form.append('folder', folder)
+
+      const uploadRes  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form })
+      const uploadData = await uploadRes.json() as { secure_url?: string; error?: { message?: string } }
+
+      if (!uploadRes.ok || !uploadData.secure_url) {
+        throw new Error(uploadData.error?.message ?? `Upload failed (${uploadRes.status})`)
+      }
+
+      setConfig({ ...config, [sectionKey]: uploadData.secure_url })
+      toast.success('Background uploaded — click Save to apply')
+    } catch {
+      toast.error('Upload failed — please try again')
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  return (
+    <Card title="🖼️ Section Backgrounds" className="md:col-span-2">
+      <p className="text-[11px] text-muted italic mb-4">
+        Set a background image for each section. Leave blank to use the default pastel colour.
+        Upload an image, then click Save to apply.
+      </p>
+      <div className="space-y-4">
+        {BG_SECTIONS.map(({ key, label, hint }) => {
+          const url = (config[key] as string) ?? ''
+          return (
+            <div key={key} className="flex flex-wrap items-center gap-3 border border-rule p-3 bg-cream">
+              {/* Thumbnail */}
+              <div className="w-16 h-16 border border-rule flex-shrink-0 overflow-hidden bg-white flex items-center justify-center">
+                {url ? (
+                  <Image src={url} alt={label} width={64} height={64} className="object-cover w-full h-full" />
+                ) : (
+                  <span className="text-[10px] text-muted">None</span>
+                )}
+              </div>
+              {/* Labels */}
+              <div className="flex-1 min-w-[140px]">
+                <p className="text-[12px] font-medium text-ink">{label}</p>
+                <p className="text-[10px] text-muted">{hint}</p>
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2 items-center">
+                <label className={clsx(
+                  'text-[10px] tracking-[1.5px] uppercase px-3 py-[7px] border cursor-pointer transition-colors',
+                  uploading === key
+                    ? 'bg-rule text-muted border-rule opacity-60 pointer-events-none'
+                    : 'bg-white border-rule text-ink hover:bg-petal',
+                )}>
+                  {uploading === key ? 'Uploading…' : 'Upload'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploading === key}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) uploadBg(key, f) }}
+                  />
+                </label>
+                {url && (
+                  <button
+                    onClick={() => setConfig({ ...config, [key]: '' })}
+                    className="text-[10px] tracking-[1.5px] uppercase px-3 py-[7px] border border-rule bg-white text-rose hover:bg-petal transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <SaveButton onSave={onSave} />
+    </Card>
   )
 }
 
@@ -269,14 +419,115 @@ function RSVPsTab({ rsvps, stats, onExport }: {
 }
 
 // ─── Gallery tab ──────────────────────────────────────────────────────────────
+function SortablePhotoCard({
+  photo,
+  onToggleVisible,
+  onEdit,
+  onDelete,
+}: {
+  photo:           GalleryPhoto
+  onToggleVisible: (id: number, v: boolean) => void
+  onEdit:          (id: number, cap: string) => void
+  onDelete:        (id: number) => void
+}) {
+  const {
+    attributes, listeners, setNodeRef,
+    transform, transition, isDragging,
+  } = useSortable({ id: photo.id })
+
+  const style = {
+    transform:  CSS.Transform.toString(transform),
+    transition,
+    opacity:    isDragging ? 0.5 : 1,
+  }
+
+  const [editMode, setEditMode] = useState(false)
+  const [cap,      setCap]      = useState(photo.caption ?? '')
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={clsx(
+        'border border-rule overflow-hidden group',
+        !photo.visible && 'opacity-50',
+      )}
+    >
+      {/* Drag handle area */}
+      <div
+        {...attributes}
+        {...listeners}
+        className="h-4 bg-cream flex items-center justify-center cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex gap-[3px]">
+          {[0,1,2,3,4,5].map(d => <div key={d} className="w-[3px] h-[3px] rounded-full bg-rule" />)}
+        </div>
+      </div>
+
+      <div className="relative aspect-square">
+        <Image
+          src={photo.url}
+          alt={photo.caption ?? 'Gallery photo'}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 50vw, 25vw"
+        />
+        {!photo.visible && (
+          <div className="absolute inset-0 flex items-center justify-center bg-ink/30">
+            <span className="text-white text-[9px] tracking-[1.5px] uppercase bg-ink/70 px-2 py-0.5">Hidden</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/30 transition-colors duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+          <button
+            onClick={() => onToggleVisible(photo.id, !photo.visible)}
+            className="bg-white text-ink text-[9px] tracking-[1px] uppercase px-2 py-1 hover:bg-petal"
+          >
+            {photo.visible ? 'Hide' : 'Show'}
+          </button>
+          <button
+            onClick={() => { setEditMode(true); setCap(photo.caption ?? '') }}
+            className="bg-white text-ink text-[9px] tracking-[1px] uppercase px-2 py-1 hover:bg-petal"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => onDelete(photo.id)}
+            className="bg-rose text-white text-[9px] tracking-[1px] uppercase px-2 py-1 hover:bg-rosedark"
+          >
+            Del
+          </button>
+        </div>
+      </div>
+
+      {editMode ? (
+        <div className="p-2 flex gap-1">
+          <input
+            value={cap}
+            onChange={e => setCap(e.target.value)}
+            className="flex-1 text-[11px] border border-rule px-2 py-1 outline-none focus:border-rose bg-cream"
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') { onEdit(photo.id, cap); setEditMode(false) } }}
+          />
+          <button onClick={() => { onEdit(photo.id, cap); setEditMode(false) }} className="text-[10px] text-rose px-1">✓</button>
+          <button onClick={() => setEditMode(false)} className="text-[10px] text-muted px-1">✕</button>
+        </div>
+      ) : (
+        <p className="text-[11px] text-muted px-2 py-1 truncate">
+          {photo.caption ?? <em className="opacity-50">No caption</em>}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function GalleryTab() {
   const router = useRouter()
   const [photos,    setPhotos]    = useState<GalleryPhoto[]>([])
   const [uploading, setUploading] = useState(false)
   const [caption,   setCaption]   = useState('')
-  const [editId,    setEditId]    = useState<number | null>(null)
-  const [editCap,   setEditCap]   = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const loadPhotos = useCallback(async () => {
     const res  = await fetch('/api/admin/gallery', { credentials: cred })
@@ -294,18 +545,13 @@ function GalleryTab() {
       const paramsToSign = { timestamp: String(timestamp), folder }
 
       const signRes = await fetch('/api/admin/gallery/sign', {
-        method:      'POST',
-        credentials: cred,
-        headers:     { 'Content-Type': 'application/json' },
-        body:        JSON.stringify({ paramsToSign }),
+        method: 'POST', credentials: cred,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paramsToSign }),
       })
       if (!signRes.ok) {
-        if (signRes.status === 401) {
-          toast.error('Session expired — please log in again')
-          router.push('/admin/login')
-        } else {
-          toast.error('Could not authorize upload')
-        }
+        if (signRes.status === 401) { toast.error('Session expired'); router.push('/admin/login') }
+        else toast.error('Could not authorize upload')
         return
       }
       const { signature, apiKey, cloudName } = await signRes.json() as {
@@ -313,48 +559,27 @@ function GalleryTab() {
       }
 
       const form = new FormData()
-      form.append('file',      file)
+      form.append('file', file)
       form.append('signature', signature)
-      form.append('api_key',   apiKey)
+      form.append('api_key', apiKey)
       form.append('timestamp', String(timestamp))
-      form.append('folder',    folder)
+      form.append('folder', folder)
 
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: 'POST', body: form },
-      )
-      const uploadData = await uploadRes.json() as {
-        secure_url?: string
-        public_id?: string
-        error?:    { message?: string }
-      }
+      const uploadRes  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form })
+      const uploadData = await uploadRes.json() as { secure_url?: string; public_id?: string; error?: { message?: string } }
 
       if (!uploadRes.ok || !uploadData.secure_url) {
-        const cloudErr =
-          uploadData.error?.message
-          ?? (uploadRes.status === 401
-            ? 'Invalid Cloudinary credentials or signature — check CLOUDINARY_* env vars on the server'
-            : `Upload failed (${uploadRes.status})`)
-        throw new Error(cloudErr)
+        throw new Error(uploadData.error?.message ?? `Upload failed (${uploadRes.status})`)
       }
 
       const saveRes = await fetch('/api/admin/gallery', {
-        method:      'POST',
-        credentials: cred,
-        headers:     { 'Content-Type': 'application/json' },
-        body:        JSON.stringify({
-          url:      uploadData.secure_url,
-          publicId: uploadData.public_id,
-          caption:  caption.trim() || undefined,
-        }),
+        method: 'POST', credentials: cred,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: uploadData.secure_url, publicId: uploadData.public_id, caption: caption.trim() || undefined }),
       })
       if (!saveRes.ok) {
-        if (saveRes.status === 401) {
-          toast.error('Session expired — please log in again')
-          router.push('/admin/login')
-        } else {
-          toast.error('Could not save photo to gallery')
-        }
+        if (saveRes.status === 401) { toast.error('Session expired'); router.push('/admin/login') }
+        else toast.error('Could not save photo')
         return
       }
 
@@ -362,12 +587,31 @@ function GalleryTab() {
       setCaption('')
       if (fileRef.current) fileRef.current.value = ''
       loadPhotos()
-    } catch (err) {
+    } catch {
       toast.error('Upload failed — please try again')
-      console.error(err)
     } finally {
       setUploading(false)
     }
+  }
+
+  const toggleVisible = async (id: number, visible: boolean) => {
+    setPhotos(prev => prev.map(p => p.id === id ? { ...p, visible } : p))
+    await fetch('/api/admin/gallery', {
+      method: 'PATCH', credentials: cred,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, visible }),
+    })
+    toast.success(visible ? 'Photo visible' : 'Photo hidden')
+  }
+
+  const saveCaption = async (id: number, cap: string) => {
+    setPhotos(prev => prev.map(p => p.id === id ? { ...p, caption: cap } : p))
+    await fetch('/api/admin/gallery', {
+      method: 'PATCH', credentials: cred,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, caption: cap }),
+    })
+    toast.success('Caption saved')
   }
 
   const deletePhoto = async (id: number) => {
@@ -377,16 +621,18 @@ function GalleryTab() {
     toast.success('Photo removed')
   }
 
-  const saveCaption = async (id: number) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = photos.findIndex(p => p.id === active.id)
+    const newIndex = photos.findIndex(p => p.id === over.id)
+    const reordered = arrayMove(photos, oldIndex, newIndex)
+    setPhotos(reordered)
     await fetch('/api/admin/gallery', {
-      method:      'PATCH',
-      credentials: cred,
-      headers:     { 'Content-Type': 'application/json' },
-      body:        JSON.stringify({ id, caption: editCap }),
+      method: 'PUT', credentials: cred,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: reordered.map(p => p.id) }),
     })
-    setPhotos(prev => prev.map(p => p.id === id ? { ...p, caption: editCap } : p))
-    setEditId(null)
-    toast.success('Caption saved')
   }
 
   return (
@@ -403,14 +649,8 @@ function GalleryTab() {
               placeholder="e.g. Engagement shoot"
             />
           </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f) }}
-            disabled={uploading}
-          />
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f) }} disabled={uploading} />
           <button
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
@@ -420,8 +660,7 @@ function GalleryTab() {
           </button>
         </div>
         <p className="text-[11px] text-muted mt-3 italic">
-          Images upload directly to Cloudinary and are optimised automatically.
-          The first photo appears as the featured (wide) image in the gallery.
+          Drag cards to reorder. Use Hide/Show to control public visibility without deleting.
         </p>
       </div>
 
@@ -435,63 +674,193 @@ function GalleryTab() {
             No photos yet — upload your first one above.
           </p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <AnimatePresence>
-              {photos.map(photo => (
-                <motion.div
-                  key={photo.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{    opacity: 0, scale: 0.9 }}
-                  transition={{ duration: 0.3 }}
-                  className="border border-rule overflow-hidden group"
-                >
-                  <div className="relative aspect-square">
-                    <Image
-                      src={photo.url}
-                      alt={photo.caption ?? 'Gallery photo'}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 50vw, 25vw"
-                    />
-                    <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/30 transition-colors duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                      <button
-                        onClick={() => { setEditId(photo.id); setEditCap(photo.caption ?? '') }}
-                        className="bg-white text-ink text-[9px] tracking-[1px] uppercase px-2 py-1 hover:bg-petal"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => deletePhoto(photo.id)}
-                        className="bg-rose text-white text-[9px] tracking-[1px] uppercase px-2 py-1 hover:bg-rosedark"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-
-                  {editId === photo.id ? (
-                    <div className="p-2 flex gap-1">
-                      <input
-                        value={editCap}
-                        onChange={e => setEditCap(e.target.value)}
-                        className="flex-1 text-[11px] border border-rule px-2 py-1 outline-none focus:border-rose bg-cream"
-                        autoFocus
-                        onKeyDown={e => e.key === 'Enter' && saveCaption(photo.id)}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={photos.map(p => p.id)} strategy={rectSortingStrategy}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <AnimatePresence>
+                  {photos.map(photo => (
+                    <motion.div
+                      key={photo.id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{    opacity: 0, scale: 0.9 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <SortablePhotoCard
+                        photo={photo}
+                        onToggleVisible={toggleVisible}
+                        onEdit={saveCaption}
+                        onDelete={deletePhoto}
                       />
-                      <button onClick={() => saveCaption(photo.id)} className="text-[10px] text-rose px-1">✓</button>
-                      <button onClick={() => setEditId(null)} className="text-[10px] text-muted px-1">✕</button>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-muted px-2 py-1 truncate">
-                      {photo.caption ?? <em className="opacity-50">No caption</em>}
-                    </p>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Story tab ────────────────────────────────────────────────────────────────
+const STORY_SLOTS = [
+  { slot: 1, label: 'Chapter I',    stamp: 'The beginning of everything'    },
+  { slot: 2, label: 'Chapter II',   stamp: 'Adventures, big and small'      },
+  { slot: 3, label: 'Chapter III',  stamp: 'Exploring the world together'   },
+  { slot: 4, label: 'Chapter IV',   stamp: 'Every season, better together'  },
+  { slot: 5, label: 'The Proposal', stamp: 'He asked. She said yes.'        },
+  { slot: 6, label: 'Chapter ∞',   stamp: 'Feb 27, 2027 — forever begins'  },
+]
+
+function StoryTab() {
+  const router    = useRouter()
+  const [photos,    setPhotos]    = useState<GalleryPhoto[]>([])
+  const [uploading, setUploading] = useState<number | null>(null)
+  const fileRefs  = useRef<Record<number, HTMLInputElement | null>>({})
+
+  const loadPhotos = useCallback(async () => {
+    const res  = await fetch('/api/admin/story', { credentials: cred })
+    const json = await res.json()
+    setPhotos(json.photos ?? [])
+  }, [])
+
+  useEffect(() => { loadPhotos() }, [loadPhotos])
+
+  const photoBySlot = new Map<number, GalleryPhoto>()
+  photos.forEach(p => { if (p.storySlot !== null) photoBySlot.set(p.storySlot, p) })
+
+  const uploadForSlot = async (slot: number, file: File) => {
+    setUploading(slot)
+    try {
+      const timestamp    = Math.round(Date.now() / 1000)
+      const folder       = 'wedding/story'
+      const paramsToSign = { timestamp: String(timestamp), folder }
+
+      const signRes = await fetch('/api/admin/gallery/sign', {
+        method: 'POST', credentials: cred,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paramsToSign }),
+      })
+      if (!signRes.ok) {
+        if (signRes.status === 401) { toast.error('Session expired'); router.push('/admin/login') }
+        else toast.error('Could not sign upload')
+        return
+      }
+      const { signature, apiKey, cloudName } = await signRes.json() as {
+        signature: string; apiKey: string; cloudName: string
+      }
+
+      const form = new FormData()
+      form.append('file', file)
+      form.append('signature', signature)
+      form.append('api_key', apiKey)
+      form.append('timestamp', String(timestamp))
+      form.append('folder', folder)
+
+      const uploadRes  = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: form })
+      const uploadData = await uploadRes.json() as { secure_url?: string; public_id?: string; error?: { message?: string } }
+
+      if (!uploadRes.ok || !uploadData.secure_url) {
+        throw new Error(uploadData.error?.message ?? `Upload failed (${uploadRes.status})`)
+      }
+
+      // Save photo with album=story and storySlot
+      const saveRes = await fetch('/api/admin/gallery', {
+        method: 'POST', credentials: cred,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url:       uploadData.secure_url,
+          publicId:  uploadData.public_id,
+          album:     'story',
+          storySlot: slot,
+        }),
+      })
+      if (!saveRes.ok) {
+        toast.error('Could not save story photo')
+        return
+      }
+
+      toast.success(`Slot ${slot} updated!`)
+      loadPhotos()
+    } catch {
+      toast.error('Upload failed — please try again')
+    } finally {
+      setUploading(null)
+      const ref = fileRefs.current[slot]
+      if (ref) ref.value = ''
+    }
+  }
+
+  const removeSlot = async (photo: GalleryPhoto) => {
+    if (!confirm('Remove this story photo?')) return
+    await fetch(`/api/admin/story?id=${photo.id}`, { method: 'DELETE', credentials: cred })
+    setPhotos(prev => prev.filter(p => p.id !== photo.id))
+    toast.success('Story photo removed')
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-white border border-rule p-6">
+        <h4 className="text-[9px] tracking-[3px] uppercase text-rose mb-2">📸 Story Photos</h4>
+        <p className="text-[11px] text-muted italic mb-5">
+          Upload a photo for each chapter slot. If empty, the emoji placeholder is shown.
+        </p>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {STORY_SLOTS.map(({ slot, label, stamp }) => {
+            const photo = photoBySlot.get(slot)
+            return (
+              <div key={slot} className="border border-rule bg-cream p-3">
+                {/* Slot header */}
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-[11px] font-medium text-ink">{label}</p>
+                    <p className="text-[10px] text-muted italic truncate">{stamp}</p>
+                  </div>
+                </div>
+
+                {/* Photo or empty */}
+                <div className="relative aspect-square w-full bg-white border border-rule mb-2 overflow-hidden flex items-center justify-center">
+                  {photo ? (
+                    <Image src={photo.url} alt={label} fill className="object-cover" sizes="200px" />
+                  ) : (
+                    <span className="text-[10px] text-muted italic">No photo</span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2">
+                  <label className={clsx(
+                    'flex-1 text-center text-[9px] tracking-[1.5px] uppercase py-[6px] border cursor-pointer transition-colors',
+                    uploading === slot
+                      ? 'bg-rule text-muted border-rule opacity-60 pointer-events-none'
+                      : 'bg-rose text-white border-rose hover:bg-rosedark',
+                  )}>
+                    {uploading === slot ? 'Uploading…' : photo ? 'Replace' : 'Upload'}
+                    <input
+                      ref={el => { fileRefs.current[slot] = el }}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploading === slot}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) uploadForSlot(slot, f) }}
+                    />
+                  </label>
+                  {photo && (
+                    <button
+                      onClick={() => removeSlot(photo)}
+                      className="px-2 py-[6px] border border-rule bg-white text-rose text-[9px] hover:bg-petal transition-colors"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

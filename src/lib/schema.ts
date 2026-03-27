@@ -37,6 +37,12 @@ export const galleryPhotos = pgTable('gallery_photos', {
   publicId:  text('public_id'),               // Cloudinary public_id (for deletion)
   caption:   varchar('caption',  { length: 255 }),
   sortOrder: integer('sort_order').notNull().default(0),
+  // F2: album discriminates gallery vs story photos
+  album:     varchar('album', { length: 20 }).notNull().default('gallery'),
+  // F2: maps a story photo to a chapter slot (1-6); null for gallery photos
+  storySlot: integer('story_slot'),
+  // F3: hide without deleting
+  visible:   boolean('visible').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
@@ -58,6 +64,12 @@ export const weddingConfig = pgTable('wedding_config', {
   guestNotes:      text('guest_notes'),
   rsvpDeadline:    varchar('rsvp_deadline',   { length: 50  }),
   heroVideoUrl:    text('hero_video_url'),
+  // F4: per-section background images (Cloudinary URLs)
+  heroBgUrl:       text('hero_bg_url'),
+  storyBgUrl:      text('story_bg_url'),
+  countdownBgUrl:  text('countdown_bg_url'),
+  detailsBgUrl:    text('details_bg_url'),
+  galleryBgUrl:    text('gallery_bg_url'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 })
 

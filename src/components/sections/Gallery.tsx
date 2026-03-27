@@ -6,8 +6,9 @@ import {
   motion, useScroll, useTransform, AnimatePresence,
   type MotionValue,
 } from 'framer-motion'
-import { SectionHeader } from '@/components/ui/SectionHeader'
-import { fadeIn } from '@/lib/animations'
+import { SectionHeader }    from '@/components/ui/SectionHeader'
+import { SectionBackground } from '@/components/ui/SectionBackground'
+import { fadeIn }            from '@/lib/animations'
 import type { GalleryPhotoData } from '@/types'
 import clsx from 'clsx'
 
@@ -72,7 +73,7 @@ function StackCard({
         whileHover={onClick ? { y: -10, boxShadow: '0 24px 60px rgba(46,31,26,0.22)' } : undefined}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
         className={clsx(
-          'bg-white p-3 pb-14 w-[210px] sm:w-[260px]',
+          'bg-white p-3 pb-14 w-[210px] sm:w-[312px]',
           'shadow-[0_8px_40px_rgba(46,31,26,0.14)]',
           onClick && 'cursor-pointer select-none',
         )}
@@ -83,7 +84,7 @@ function StackCard({
               src={photo.url}
               alt={photo.caption ?? `Photo ${index + 1}`}
               fill
-              sizes="(max-width: 640px) 210px, 260px"
+              sizes="(max-width: 640px) 210px, 312px"
               className="object-cover"
             />
           </div>
@@ -147,7 +148,7 @@ function StackProgress({
 }
 
 // ─── Main Gallery ─────────────────────────────────────────────────────────────
-export function Gallery() {
+export function Gallery({ bgUrl }: { bgUrl?: string }) {
   const [photos,   setPhotos]   = useState<GalleryPhotoData[]>([])
   const [loading,  setLoading]  = useState(true)
   const [lightbox, setLightbox] = useState<number | null>(null)
@@ -191,12 +192,13 @@ export function Gallery() {
       <section
         id="gallery"
         ref={trackRef}
-        style={{ height: `${(total + 1) * 100}vh` }}
+        style={{ height: `${(total + 1) * 100}svh` }}
         className="relative"
       >
-        <div className="sticky top-0 h-screen bg-sage flex flex-col overflow-hidden">
+        <div className="sticky top-0 h-[100svh] relative flex flex-col overflow-hidden">
+          <SectionBackground imageUrl={bgUrl} fallbackColor="bg-sage" overlayClass="bg-white/20" />
           {/* Section header — visible at top of sticky viewport */}
-          <div className="shrink-0 pt-16 pb-4">
+          <div className="relative z-10 shrink-0 pt-16 pb-4">
             <SectionHeader
               eyebrow="Luis & Bee"
               heading="Moments we"
@@ -205,7 +207,7 @@ export function Gallery() {
           </div>
 
           {/* Stack arena — cards positioned absolutely inside here */}
-          <div className="relative flex-1">
+          <div className="relative z-10 flex-1">
             {stackItems.map((item, i) =>
               hasPhotos ? (
                 <StackCard

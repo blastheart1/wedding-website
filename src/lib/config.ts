@@ -18,6 +18,12 @@ export interface PublicConfig {
   guestNotes:     string
   rsvpDeadline:   string
   heroVideoUrl:   string
+  // F4: per-section background images
+  heroBgUrl:      string
+  storyBgUrl:     string
+  countdownBgUrl: string
+  detailsBgUrl:   string
+  galleryBgUrl:   string
 }
 
 /**
@@ -48,6 +54,11 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         guestNotes:     row.guestNotes     ?? DEFAULT_CONFIG.guestNotes,
         rsvpDeadline:   row.rsvpDeadline   ?? DEFAULT_CONFIG.rsvpDeadline,
         heroVideoUrl:   (row.heroVideoUrl ?? DEFAULT_CONFIG.heroVideoUrl).trim(),
+        heroBgUrl:      (row.heroBgUrl      ?? DEFAULT_CONFIG.heroBgUrl).trim(),
+        storyBgUrl:     (row.storyBgUrl     ?? DEFAULT_CONFIG.storyBgUrl).trim(),
+        countdownBgUrl: (row.countdownBgUrl ?? DEFAULT_CONFIG.countdownBgUrl).trim(),
+        detailsBgUrl:   (row.detailsBgUrl   ?? DEFAULT_CONFIG.detailsBgUrl).trim(),
+        galleryBgUrl:   (row.galleryBgUrl   ?? DEFAULT_CONFIG.galleryBgUrl).trim(),
       }
     }
   } catch {

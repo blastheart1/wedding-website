@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { PublicConfig } from '@/lib/config'
 
 interface HeroProps {
-  config: Pick<PublicConfig, 'partner1' | 'partner2' | 'weddingDate' | 'location' | 'heroVideoUrl'>
+  config: Pick<PublicConfig, 'partner1' | 'partner2' | 'weddingDate' | 'location' | 'heroVideoUrl' | 'heroBgUrl'>
 }
 
 function formatWeddingDate(dateStr: string): string {
@@ -22,9 +22,10 @@ function formatWeddingDate(dateStr: string): string {
 const ease = [0.22, 1, 0.36, 1] as const
 
 export function Hero({ config }: HeroProps) {
-  const { partner1, partner2, weddingDate, location, heroVideoUrl } = config
+  const { partner1, partner2, weddingDate, location, heroVideoUrl, heroBgUrl } = config
   const displayDate  = formatWeddingDate(weddingDate)
   const hasVideo     = !!heroVideoUrl
+  const hasBgImage   = !hasVideo && !!heroBgUrl
   const [modal, setModal] = useState(false)
   const modalVideoRef     = useRef<HTMLVideoElement>(null)
 
@@ -34,13 +35,14 @@ export function Hero({ config }: HeroProps) {
     modalVideoRef.current?.pause()
   }
 
-  // Text colours flip based on whether video (dark overlay) is present
-  const textColor      = hasVideo ? 'text-white'        : 'text-ink'
-  const subTextColor   = hasVideo ? 'text-white/70'     : 'text-muted'
-  const roseNameColor  = hasVideo ? 'text-blush'        : 'text-rose'
-  const ornamentColor  = hasVideo ? 'bg-white/40'       : 'bg-blush'
-  const dateColor      = hasVideo ? 'text-white/80'     : 'text-ink2'
-  const ghostBtnClass  = hasVideo
+  // Text colours flip based on whether video or bg image (dark overlay) is present
+  const hasDarkBg      = hasVideo || hasBgImage
+  const textColor      = hasDarkBg ? 'text-white'        : 'text-ink'
+  const subTextColor   = hasDarkBg ? 'text-white/70'     : 'text-muted'
+  const roseNameColor  = hasDarkBg ? 'text-blush'        : 'text-rose'
+  const ornamentColor  = hasDarkBg ? 'bg-white/40'       : 'bg-blush'
+  const dateColor      = hasDarkBg ? 'text-white/80'     : 'text-ink2'
+  const ghostBtnClass  = hasDarkBg
     ? 'border border-white/50 text-white hover:bg-white/10'
     : 'border border-rule text-ink hover:bg-petal hover:border-ink2'
 
@@ -52,7 +54,7 @@ export function Hero({ config }: HeroProps) {
         className="relative flex items-center justify-center overflow-hidden"
         style={{ height: '100svh', minHeight: '600px' }}
       >
-        {/* Background */}
+        {/* Background: video > static image > plain cream */}
         {hasVideo ? (
           <video
             key={heroVideoUrl}
@@ -64,6 +66,15 @@ export function Hero({ config }: HeroProps) {
             className="absolute inset-0 w-full h-full object-cover"
             src={heroVideoUrl}
           />
+        ) : hasBgImage ? (
+          <>
+            <img
+              src={heroBgUrl}
+              alt="Hero background"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-ink/40" />
+          </>
         ) : (
           <div className="absolute inset-0 bg-cream" />
         )}
@@ -133,7 +144,7 @@ export function Hero({ config }: HeroProps) {
           >
             <a
               href="#rsvp"
-              className="bg-rose text-white text-[10px] tracking-[3px] uppercase font-medium px-8 py-[14px] rounded-sm hover:bg-rosedark transition-colors"
+              className="inline-flex items-center justify-center bg-rose text-white text-[10px] tracking-[3px] uppercase font-medium px-8 py-[14px] rounded-sm hover:bg-rosedark transition-colors"
             >
               RSVP
             </a>
@@ -154,7 +165,7 @@ export function Hero({ config }: HeroProps) {
             ) : (
               <a
                 href="#story"
-                className={`text-[10px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
+                className={`inline-flex items-center justify-center text-[10px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
               >
                 Our Story
               </a>

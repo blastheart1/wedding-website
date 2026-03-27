@@ -17,6 +17,11 @@ export const DEFAULT_CONFIG = {
   guestNotes:     '',
   rsvpDeadline:   'January 27, 2027',
   heroVideoUrl:   '',
+  heroBgUrl:      '',
+  storyBgUrl:     '',
+  countdownBgUrl: '',
+  detailsBgUrl:   '',
+  galleryBgUrl:   '',
 }
 
 // ─── Story chapters (instax section) ─────────────────────────────────────────

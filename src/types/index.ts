@@ -40,6 +40,16 @@ export interface GalleryPhotoData {
   url:       string
   caption:   string | null
   sortOrder: number
+  album:     string
+  visible:   boolean
+  storySlot: number | null
+}
+
+// ─── Story Photo ──────────────────────────────────────────────────────────────
+export interface StoryPhotoData {
+  slot:    number
+  url:     string
+  caption: string | null
 }
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
