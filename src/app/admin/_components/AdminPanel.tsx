@@ -38,8 +38,12 @@ export function AdminPanel() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify(config),
     })
-    if (res.ok) toast.success('Settings saved!')
-    else        toast.error('Save failed')
+    if (res.ok) {
+      toast.success('Settings saved!')
+      router.refresh()
+    } else {
+      toast.error('Save failed')
+    }
   }
 
   const exportExcel = async () => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getDb, schema } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { isAdminRequest } from '@/lib/auth'
@@ -44,6 +45,10 @@ export async function POST(request: NextRequest) {
   } else {
     await db.insert(schema.weddingConfig).values(body)
   }
+
+  // Home reads config in a Server Component; without this, soft navigations can
+  // still show a cached RSC tree with the previous hero video URL.
+  revalidatePath('/', 'layout')
 
   return NextResponse.json({ success: true })
 }

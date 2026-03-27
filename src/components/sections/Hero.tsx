@@ -55,7 +55,12 @@ export function Hero({ config }: HeroProps) {
         {/* Background */}
         {hasVideo ? (
           <video
-            autoPlay muted loop playsInline
+            key={heroVideoUrl}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
             className="absolute inset-0 w-full h-full object-cover"
             src={heroVideoUrl}
           />
@@ -207,10 +212,12 @@ export function Hero({ config }: HeroProps) {
               </button>
 
               <video
+                key={heroVideoUrl}
                 ref={modalVideoRef}
                 src={heroVideoUrl}
                 controls
                 autoPlay
+                playsInline
                 className="w-full rounded-sm aspect-video bg-ink"
                 style={{ maxHeight: '80vh' }}
               />

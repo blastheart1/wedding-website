@@ -47,7 +47,7 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         hotelDiscount:  row.hotelDiscount  ?? DEFAULT_CONFIG.hotelDiscount,
         guestNotes:     row.guestNotes     ?? DEFAULT_CONFIG.guestNotes,
         rsvpDeadline:   row.rsvpDeadline   ?? DEFAULT_CONFIG.rsvpDeadline,
-        heroVideoUrl:   row.heroVideoUrl   ?? DEFAULT_CONFIG.heroVideoUrl,
+        heroVideoUrl:   (row.heroVideoUrl ?? DEFAULT_CONFIG.heroVideoUrl).trim(),
       }
     }
   } catch {
