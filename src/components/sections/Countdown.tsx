@@ -37,7 +37,7 @@ function pad(n: number) {
 // Flip digit — animates out old value, in new value
 function FlipDigit({ value }: { value: string }) {
   return (
-    <div className="relative overflow-hidden" style={{ minWidth: '1ch' }}>
+    <div className="relative overflow-hidden" style={{ minWidth: '1ch', paddingBottom: '0.12em' }}>
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={value}
@@ -82,13 +82,13 @@ export function Countdown({ config }: CountdownProps) {
   return (
     <section
       id="countdown"
-      className="bg-lavender py-24 px-6 text-center border-y border-lilac/20"
+      className="bg-lavender py-28 px-6 text-center border-y border-lilac/20"
     >
       <SectionHeader eyebrow="Counting down" heading="Until we say" headingItalic="forever" />
 
       <motion.div
         ref={ref}
-        className="flex justify-center flex-wrap"
+        className="flex justify-center flex-wrap mt-4"
         initial="hidden"
         animate={inView ? 'visible' : 'hidden'}
         variants={{
@@ -106,8 +106,8 @@ export function Countdown({ config }: CountdownProps) {
             className="px-8 md:px-10 border-r border-lilac/30 last:border-r-0"
           >
             <div
-              className="font-display font-light text-lilac flex justify-center leading-none"
-              style={{ fontSize: 'clamp(52px, 8vw, 84px)' }}
+              className="font-display font-light text-lilac flex justify-center"
+              style={{ fontSize: 'clamp(52px, 8vw, 84px)', lineHeight: 1.1 }}
             >
               {u.value.split('').map((digit, i) => (
                 <FlipDigit key={i} value={digit} />

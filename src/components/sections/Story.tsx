@@ -16,30 +16,29 @@ export function Story() {
 
       <div
         ref={ref}
-        className="grid grid-cols-2 md:grid-cols-3 gap-0 max-w-[860px] mx-auto"
+        className="grid grid-cols-2 sm:grid-cols-3 gap-0 max-w-[860px] mx-auto justify-items-center"
         style={{ perspective: '1200px' }}
       >
-        {STORY_CHAPTERS.map((chapter) => (
-          <div key={chapter.id} className="flex justify-center">
+        {STORY_CHAPTERS.map((chapter) => {
+          const deg = parseFloat(chapter.rotate)
+          return (
             <motion.div
-              initial={{ opacity: 0, y: 48, rotate: parseFloat(chapter.rotate) }}
-              animate={inView ? {
-                opacity: 1,
-                y: 0,
-                rotate: parseFloat(chapter.rotate),
-              } : {}}
+              key={chapter.id}
+              initial={{ opacity: 0, y: 48, rotate: deg }}
+              animate={inView ? { opacity: 1, y: 0, rotate: deg } : {}}
+              whileHover={{ rotate: 0, y: -10, scale: 1.05, zIndex: 10 }}
               transition={{
                 duration: 0.7,
                 delay: chapter.delay / 1000,
                 ease: [0.34, 1.56, 0.64, 1],
               }}
               className={clsx(
-                'instax-card bg-white relative cursor-pointer',
+                'bg-white relative cursor-pointer',
                 'shadow-[0_4px_20px_rgba(46,31,26,0.09)]',
+                'hover:shadow-[0_20px_44px_rgba(46,31,26,0.13)]',
                 'max-w-[200px] w-full',
                 'p-3 pb-11'
               )}
-              style={{ rotate: chapter.rotate.includes('-') ? `${parseFloat(chapter.rotate)}deg` : `${parseFloat(chapter.rotate)}deg` }}
             >
               {/* Photo area */}
               <div className={clsx('w-full aspect-square flex items-center justify-center mb-2 text-5xl', chapter.bg)}>
@@ -56,8 +55,8 @@ export function Story() {
                 {chapter.stamp}
               </span>
             </motion.div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </section>
   )

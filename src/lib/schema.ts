@@ -57,6 +57,7 @@ export const weddingConfig = pgTable('wedding_config', {
   hotelDiscount:   varchar('hotel_discount',  { length: 50  }),
   guestNotes:      text('guest_notes'),
   rsvpDeadline:    varchar('rsvp_deadline',   { length: 50  }),
+  heroVideoUrl:    text('hero_video_url'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 })
 

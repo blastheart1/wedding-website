@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, schema } from '@/lib/db'
+import { isAdminRequest } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 
-function isAuthenticated(request: NextRequest): boolean {
-  const auth = request.headers.get('x-admin-password')
-  return !!auth && auth === process.env.ADMIN_PASSWORD
-}
-
 export async function GET(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

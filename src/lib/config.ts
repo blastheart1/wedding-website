@@ -17,6 +17,7 @@ export interface PublicConfig {
   hotelDiscount:  string
   guestNotes:     string
   rsvpDeadline:   string
+  heroVideoUrl:   string
 }
 
 /**
@@ -46,6 +47,7 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         hotelDiscount:  row.hotelDiscount  ?? DEFAULT_CONFIG.hotelDiscount,
         guestNotes:     row.guestNotes     ?? DEFAULT_CONFIG.guestNotes,
         rsvpDeadline:   row.rsvpDeadline   ?? DEFAULT_CONFIG.rsvpDeadline,
+        heroVideoUrl:   row.heroVideoUrl   ?? DEFAULT_CONFIG.heroVideoUrl,
       }
     }
   } catch {

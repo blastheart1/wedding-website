@@ -2,16 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDb, schema } from '@/lib/db'
 import { eq, max, asc } from 'drizzle-orm'
 import { deleteImage } from '@/lib/cloudinary'
+import { isAdminRequest } from '@/lib/auth'
 import { z } from 'zod'
-
-function isAuthenticated(req: NextRequest): boolean {
-  const auth = req.headers.get('x-admin-password')
-  return !!auth && auth === process.env.ADMIN_PASSWORD
-}
 
 // ─── GET: list all photos ─────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -32,7 +28,7 @@ const saveSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -40,7 +36,6 @@ export async function POST(request: NextRequest) {
   const data = saveSchema.parse(body)
   const db   = getDb()
 
-  // Append after the current last photo
   const [{ maxOrder }] = await db
     .select({ maxOrder: max(schema.galleryPhotos.sortOrder) })
     .from(schema.galleryPhotos)
@@ -62,7 +57,7 @@ const patchSchema = z.object({
 })
 
 export async function PATCH(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -80,7 +75,7 @@ export async function PATCH(request: NextRequest) {
 
 // ─── DELETE: remove photo from DB + Cloudinary ───────────────────────────────
 export async function DELETE(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -101,7 +96,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  // Delete from Cloudinary if we stored the public_id
   if (photo.publicId) {
     try { await deleteImage(photo.publicId) } catch { /* non-fatal */ }
   }

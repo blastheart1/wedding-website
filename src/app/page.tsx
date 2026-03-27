@@ -1,15 +1,14 @@
-import { Navbar }        from '@/components/sections/Navbar'
-import { Hero }          from '@/components/sections/Hero'
-import { Story }         from '@/components/sections/Story'
-import { Countdown }     from '@/components/sections/Countdown'
-import { Details }       from '@/components/sections/Details'
-import { Gallery }       from '@/components/sections/Gallery'
-import { RSVPSection }   from '@/components/sections/RSVPSection'
-import { Footer }        from '@/components/sections/Footer'
-import { FloralDivider } from '@/components/ui/FloralDivider'
+import { Navbar }      from '@/components/sections/Navbar'
+import { Hero }        from '@/components/sections/Hero'
+import { Story }       from '@/components/sections/Story'
+import { Countdown }   from '@/components/sections/Countdown'
+import { Details }     from '@/components/sections/Details'
+import { Gallery }     from '@/components/sections/Gallery'
+import { RSVPSection } from '@/components/sections/RSVPSection'
+import { Footer }      from '@/components/sections/Footer'
+import { FloralBand, FloralPop } from '@/components/ui/FloralDivider'
 import { getWeddingConfig } from '@/lib/config'
 
-// Always render at request time so config changes show immediately.
 export const dynamic = 'force-dynamic'
 
 export default async function Home() {
@@ -19,14 +18,20 @@ export default async function Home() {
     <main>
       <Navbar config={config} />
       <Hero   config={config} />
+
+      <FloralBand height={130} />
+
       <Story />
-      <FloralDivider height={120} />
+
+      <FloralPop className="bg-petal" />
+
       <Countdown   config={config} />
       <Details     config={config} />
-      <FloralDivider height={120} />
+
+      <FloralBand height={130} />
+
       <Gallery />
       <RSVPSection config={config} />
-      <FloralDivider height={130} flip />
       <Footer config={config} />
     </main>
   )

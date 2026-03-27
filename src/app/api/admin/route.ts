@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, schema } from '@/lib/db'
 import { eq } from 'drizzle-orm'
-
-function isAuthenticated(request: NextRequest): boolean {
-  const auth = request.headers.get('x-admin-password')
-  return !!auth && auth === process.env.ADMIN_PASSWORD
-}
+import { isAdminRequest } from '@/lib/auth'
 
 // ─── GET: fetch config + rsvp stats ───────────────────────────────────────────
 export async function GET(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -32,7 +28,7 @@ export async function GET(request: NextRequest) {
 
 // ─── POST: upsert config ──────────────────────────────────────────────────────
 export async function POST(request: NextRequest) {
-  if (!isAuthenticated(request)) {
+  if (!await isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
