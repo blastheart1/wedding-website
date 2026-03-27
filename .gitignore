@@ -1,0 +1,68 @@
+# ─── Dependencies ─────────────────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# ─── Build output ─────────────────────────────────────────────────────────────
+.next/
+out/
+dist/
+build/
+
+# ─── Environment variables — NEVER commit secrets ─────────────────────────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# .env.local.example is intentionally NOT ignored (safe to commit)
+
+# ─── OS & editor artifacts ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+*.pem
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-debug.log*
+
+# ─── TypeScript ───────────────────────────────────────────────────────────────
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── Drizzle ──────────────────────────────────────────────────────────────────
+# Keep generated SQL migrations but ignore drizzle-kit meta cache
+drizzle/meta/
+
+# ─── Vercel ───────────────────────────────────────────────────────────────────
+.vercel
+
+# ─── Testing ──────────────────────────────────────────────────────────────────
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# ─── Claude Code (local AI assistant memory — not project code) ───────────────
+.claude/
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.tgz
+.cache/
+tmp/
+temp/

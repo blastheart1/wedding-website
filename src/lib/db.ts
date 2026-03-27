@@ -1,0 +1,17 @@
+import { neon } from '@neondatabase/serverless'
+import { drizzle } from 'drizzle-orm/neon-http'
+import * as schema from './schema'
+
+// Lazy singleton — throws only at call time, not at module import.
+// This prevents `next build` from failing when DATABASE_URL is absent.
+let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
+
+export function getDb() {
+  if (_db) return _db
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL environment variable is not set')
+  _db = drizzle(neon(url), { schema })
+  return _db
+}
+
+export { schema }
