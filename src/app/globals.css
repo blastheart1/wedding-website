@@ -11,15 +11,15 @@
 
 html {
   scroll-behavior: smooth;
-  /* overflow-x on html (not body) prevents horizontal scroll without creating
-     a new scroll container — keeps position:fixed anchored to the viewport */
-  overflow-x: hidden;
 }
 
 body {
   font-family: var(--font-jost);
   background-color: #FDFAF6;
   color: #2E1F1A;
+  /* overflow-x on body (not html) — overflow on html breaks position:sticky
+     (e.g. gallery scroll stack) in several browsers */
+  overflow-x: hidden;
 }
 
 /* ─── Typography utilities ─────────────────────────────────────────────── */

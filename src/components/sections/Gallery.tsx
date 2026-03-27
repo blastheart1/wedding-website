@@ -45,11 +45,14 @@ function StackCard({
   const N = total + 1
   const entryStart = index / N        // when this card begins flying in
   const entryMid   = (index + 0.5) / N // when it fully lands
+  // Avoid duplicate "0" in the input range (index 0 has entryStart === 0) — framer-motion
+  // useTransform mis-interpolates duplicate keys and breaks the stack animation.
+  const yRangeStart = Math.max(entryStart, 0.001)
 
   // Slide up from below during entry segment, stay at 0 afterward
   const y = useTransform(
     scrollYProgress,
-    [0, entryStart, entryMid, 1],
+    [0, yRangeStart, entryMid, 1],
     ['115%', '115%', '0%', '0%'],
   )
 
@@ -154,7 +157,7 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
   const [lightbox, setLightbox] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch('/api/gallery')
+    fetch('/api/gallery', { cache: 'no-store' })
       .then(r => r.json())
       .then(j => setPhotos(j.photos ?? []))
       .catch(() => setPhotos([]))
@@ -195,7 +198,7 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
         style={{ height: `${(total + 1) * 100}svh` }}
         className="relative"
       >
-        <div className="sticky top-0 h-[100svh] relative flex flex-col overflow-hidden">
+        <div className="sticky top-0 h-[100svh] min-h-0 relative flex flex-col overflow-hidden">
           <SectionBackground imageUrl={bgUrl} fallbackColor="bg-sage" overlayClass="bg-white/20" />
           {/* Section header — visible at top of sticky viewport */}
           <div className="relative z-10 shrink-0 pt-16 pb-4">
@@ -207,7 +210,7 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
           </div>
 
           {/* Stack arena — cards positioned absolutely inside here */}
-          <div className="relative z-10 flex-1">
+          <div className="relative z-10 flex-1 min-h-0 min-w-0">
             {stackItems.map((item, i) =>
               hasPhotos ? (
                 <StackCard

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDb, schema } from '@/lib/db'
-import { eq, and, asc } from 'drizzle-orm'
+import { eq, and, asc, or, isNull } from 'drizzle-orm'
 import type { StoryPhotoData } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +14,10 @@ export async function GET() {
       .where(
         and(
           eq(schema.galleryPhotos.album, 'story'),
-          eq(schema.galleryPhotos.visible, true),
+          or(
+            eq(schema.galleryPhotos.visible, true),
+            isNull(schema.galleryPhotos.visible),
+          ),
         ),
       )
       .orderBy(asc(schema.galleryPhotos.storySlot))

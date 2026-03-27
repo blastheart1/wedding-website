@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getDb, schema } from '@/lib/db'
 import { eq, max, asc, and } from 'drizzle-orm'
 import { deleteImage } from '@/lib/cloudinary'
@@ -71,6 +72,8 @@ export async function POST(request: NextRequest) {
     })
     .returning()
 
+  revalidatePath('/', 'layout')
+
   return NextResponse.json({ photo })
 }
 
@@ -99,6 +102,8 @@ export async function PATCH(request: NextRequest) {
     .set(updates)
     .where(eq(schema.galleryPhotos.id, data.id))
 
+  revalidatePath('/', 'layout')
+
   return NextResponse.json({ success: true })
 }
 
@@ -124,6 +129,8 @@ export async function PUT(request: NextRequest) {
         .where(eq(schema.galleryPhotos.id, id)),
     ),
   )
+
+  revalidatePath('/', 'layout')
 
   return NextResponse.json({ success: true })
 }
@@ -156,6 +163,8 @@ export async function DELETE(request: NextRequest) {
   }
 
   await db.delete(schema.galleryPhotos).where(eq(schema.galleryPhotos.id, id))
+
+  revalidatePath('/', 'layout')
 
   return NextResponse.json({ success: true })
 }

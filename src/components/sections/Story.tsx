@@ -18,7 +18,7 @@ export function Story({ bgUrl }: StoryProps) {
   const [storyPhotos, setStoryPhotos] = useState<StoryPhotoData[]>([])
 
   useEffect(() => {
-    fetch('/api/story')
+    fetch('/api/story', { cache: 'no-store' })
       .then(r => r.json())
       .then(j => setStoryPhotos(j.photos ?? []))
       .catch(() => setStoryPhotos([]))
