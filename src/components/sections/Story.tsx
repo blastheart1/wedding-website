@@ -32,7 +32,7 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS }: StoryProps) {
 
   return (
     <section id="story" className="relative py-24 px-6">
-      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-petal" parallax />
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-petal" />
 
       <div className="relative z-10">
         <SectionHeader eyebrow="Luis & Bee" heading="A story worth" headingItalic="telling" />
