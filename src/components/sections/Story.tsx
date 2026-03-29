@@ -6,15 +6,17 @@ import { motion, useInView } from 'framer-motion'
 import { STORY_CHAPTERS } from '@/lib/constants'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { SectionBackground } from '@/components/ui/SectionBackground'
-import type { StoryPhotoData, StoryChapter } from '@/types'
+import type { StoryPhotoData, StoryChapter, SectionHeading } from '@/types'
+import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 import clsx from 'clsx'
 
 interface StoryProps {
   bgUrl?:    string
   chapters?: StoryChapter[]
+  heading?:  SectionHeading
 }
 
-export function Story({ bgUrl, chapters = STORY_CHAPTERS }: StoryProps) {
+export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECTION_HEADINGS.story }: StoryProps) {
   const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-100px' })
   const [storyPhotos, setStoryPhotos] = useState<StoryPhotoData[]>([])
@@ -35,7 +37,7 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS }: StoryProps) {
       <SectionBackground imageUrl={bgUrl} fallbackColor="bg-petal" />
 
       <div className="relative z-10">
-        <SectionHeader eyebrow="Luis & Bee" heading="A story worth" headingItalic="telling" />
+        <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
 
         <div
           ref={ref}

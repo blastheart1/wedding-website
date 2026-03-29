@@ -6,13 +6,15 @@ import { zodResolver }    from '@hookform/resolvers/zod'
 import { z }              from 'zod'
 import { toast }          from 'sonner'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
-import { MEAL_OPTIONS }   from '@/lib/constants'
+import { MEAL_OPTIONS, DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 import type { PublicConfig } from '@/lib/config'
 import { fadeUp, stagger }   from '@/lib/animations'
+import type { SectionHeading } from '@/types'
 import clsx from 'clsx'
 
 interface RSVPSectionProps {
-  config: Pick<PublicConfig, 'rsvpDeadline' | 'partner1' | 'partner2' | 'weddingDate'>
+  config:   Pick<PublicConfig, 'rsvpDeadline' | 'partner1' | 'partner2' | 'weddingDate'>
+  heading?: SectionHeading
 }
 
 const schema = z.object({
@@ -37,7 +39,7 @@ const inputClass = clsx(
 
 const labelClass = 'block text-[9px] tracking-[3px] uppercase text-muted mb-1'
 
-export function RSVPSection({ config }: RSVPSectionProps) {
+export function RSVPSection({ config, heading = DEFAULT_SECTION_HEADINGS.rsvp }: RSVPSectionProps) {
   const { rsvpDeadline, partner1, partner2, weddingDate } = config
   const [submittedData, setSubmittedData] = useState<FormData | null>(null)
 
@@ -85,9 +87,9 @@ export function RSVPSection({ config }: RSVPSectionProps) {
   return (
     <section id="rsvp" className="bg-petal border-t border-blush min-h-screen flex flex-col items-center justify-center px-6 py-8">
       <div className="w-full">
-      <p className="text-[9px] tracking-[4px] uppercase text-muted text-center mb-2">You&apos;re invited</p>
+      <p className="text-[9px] tracking-[4px] uppercase text-muted text-center mb-2">{heading.eyebrow}</p>
       <h2 className="font-display font-light text-[28px] text-center mb-2">
-        Will you <em className="italic text-rose">join us?</em>
+        {heading.heading} <em className="italic text-rose">{heading.italic}</em>
       </h2>
 
       {rsvpDeadline && (

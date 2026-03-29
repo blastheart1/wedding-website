@@ -1,4 +1,4 @@
-import type { StoryChapter } from '@/types'
+import type { StoryChapter, SectionHeadings } from '@/types'
 
 // ─── Default wedding config (used as fallback when DB is unavailable) ─────────
 export const DEFAULT_CONFIG = {
@@ -34,6 +34,15 @@ export const STORY_CHAPTERS: StoryChapter[] = [
   { id: 5, emoji: '💍', caption: 'He asked. She said yes.',       stamp: 'The Proposal', bg: 'bg-blush',    rotate: '-5',   delay: 220 },
   { id: 6, emoji: '🌸', caption: 'Feb 27, 2027 — forever begins', stamp: 'Chapter ∞',    bg: 'bg-sage',     rotate: '4',    delay: 360 },
 ]
+
+// ─── Default section headings ─────────────────────────────────────────────────
+export const DEFAULT_SECTION_HEADINGS: SectionHeadings = {
+  story:     { eyebrow: 'Luis & Bee',     heading: 'A story worth',  italic: 'telling'  },
+  countdown: { eyebrow: 'Counting down',  heading: 'Until we say',   italic: 'forever'  },
+  details:   { eyebrow: 'Event Details',  heading: 'Mark your',      italic: 'calendar' },
+  gallery:   { eyebrow: 'Luis & Bee',     heading: 'Moments we',     italic: 'cherish'  },
+  rsvp:      { eyebrow: "You're invited", heading: 'Will you',       italic: 'join us?' },
+}
 
 // ─── Meal options for RSVP form ───────────────────────────────────────────────
 export const MEAL_OPTIONS = [

@@ -3,9 +3,11 @@
 import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import type { PublicConfig } from '@/lib/config'
-import { SectionHeader }     from '@/components/ui/SectionHeader'
-import { stagger, fadeUp }   from '@/lib/animations'
-import { SectionBackground } from '@/components/ui/SectionBackground'
+import { SectionHeader }           from '@/components/ui/SectionHeader'
+import { stagger, fadeUp }         from '@/lib/animations'
+import { SectionBackground }       from '@/components/ui/SectionBackground'
+import type { SectionHeading }     from '@/types'
+import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 
 interface DetailsProps {
   config: Pick<
@@ -15,7 +17,8 @@ interface DetailsProps {
     | 'dressCode' | 'hotelName' | 'hotelCode' | 'hotelDiscount'
     | 'guestNotes'
   >
-  bgUrl?: string
+  bgUrl?:   string
+  heading?: SectionHeading
 }
 
 function formatWeddingDate(dateStr: string): string {
@@ -36,7 +39,7 @@ function Line({ text }: { text: string }) {
   return <p>{text}</p>
 }
 
-export function Details({ config, bgUrl }: DetailsProps) {
+export function Details({ config, bgUrl, heading = DEFAULT_SECTION_HEADINGS.details }: DetailsProps) {
   const {
     weddingDate, ceremonyTime, receptionTime,
     ceremonyVenue, receptionVenue, location,
@@ -100,7 +103,7 @@ export function Details({ config, bgUrl }: DetailsProps) {
     <section id="details" className="relative py-24 px-6">
       <SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream" />
       <div className="relative z-10">
-      <SectionHeader eyebrow="Event Details" heading="Mark your" headingItalic="calendar" />
+      <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
 
       <motion.div
         ref={ref}

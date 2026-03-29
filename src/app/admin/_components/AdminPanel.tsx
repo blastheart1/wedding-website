@@ -208,6 +208,7 @@ function SettingsTab({
         <SaveButton onSave={onSave} />
       </Card>
       <SectionBgCard config={config} setConfig={setConfig} onSave={onSave} />
+      <SectionHeadingsCard config={config} setConfig={setConfig} onSave={onSave} />
     </div>
   )
 }
@@ -324,6 +325,84 @@ function SectionBgCard({
                     Remove
                   </button>
                 )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <SaveButton onSave={onSave} />
+    </Card>
+  )
+}
+
+// ─── Section Headings card ────────────────────────────────────────────────────
+const HEADING_SECTIONS = [
+  { key: 'story',     label: 'Story'    },
+  { key: 'countdown', label: 'Countdown'},
+  { key: 'details',   label: 'Details'  },
+  { key: 'gallery',   label: 'Gallery'  },
+  { key: 'rsvp',      label: 'RSVP'    },
+] as const
+
+const DEFAULT_HEADINGS_ADMIN = {
+  story:     { eyebrow: 'Luis & Bee',     heading: 'A story worth',  italic: 'telling'  },
+  countdown: { eyebrow: 'Counting down',  heading: 'Until we say',   italic: 'forever'  },
+  details:   { eyebrow: 'Event Details',  heading: 'Mark your',      italic: 'calendar' },
+  gallery:   { eyebrow: 'Luis & Bee',     heading: 'Moments we',     italic: 'cherish'  },
+  rsvp:      { eyebrow: "You're invited", heading: 'Will you',       italic: 'join us?' },
+}
+
+function SectionHeadingsCard({
+  config, setConfig, onSave,
+}: {
+  config:    Partial<WeddingConfig>
+  setConfig: (c: Partial<WeddingConfig>) => void
+  onSave:    () => void
+}) {
+  const parsed = (() => {
+    try {
+      const raw = config.sectionHeadings as string | undefined
+      if (!raw) return DEFAULT_HEADINGS_ADMIN
+      const p = JSON.parse(raw)
+      return {
+        story:     { ...DEFAULT_HEADINGS_ADMIN.story,     ...p.story     },
+        countdown: { ...DEFAULT_HEADINGS_ADMIN.countdown, ...p.countdown },
+        details:   { ...DEFAULT_HEADINGS_ADMIN.details,   ...p.details   },
+        gallery:   { ...DEFAULT_HEADINGS_ADMIN.gallery,   ...p.gallery   },
+        rsvp:      { ...DEFAULT_HEADINGS_ADMIN.rsvp,      ...p.rsvp      },
+      }
+    } catch {
+      return DEFAULT_HEADINGS_ADMIN
+    }
+  })()
+
+  const update = (section: keyof typeof parsed, field: 'eyebrow' | 'heading' | 'italic', value: string) => {
+    const next = { ...parsed, [section]: { ...parsed[section], [field]: value } }
+    setConfig({ ...config, sectionHeadings: JSON.stringify(next) })
+  }
+
+  return (
+    <Card title="✏️ Section Headings" className="md:col-span-2">
+      <p className="text-[11px] text-muted italic mb-4">
+        Edit the eyebrow, heading, and italic portion for each section.
+      </p>
+      <div className="space-y-3">
+        {HEADING_SECTIONS.map(({ key, label }) => {
+          const h = parsed[key]
+          return (
+            <div key={key} className="border border-rule bg-cream p-3">
+              <p className="text-[11px] font-medium text-ink mb-2">{label}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {(['eyebrow', 'heading', 'italic'] as const).map(field => (
+                  <div key={field}>
+                    <label className="block text-[9px] tracking-[1.5px] uppercase text-muted mb-1">{field}</label>
+                    <input
+                      value={h[field]}
+                      onChange={e => update(key, field, e.target.value)}
+                      className="w-full px-2 py-1.5 border border-rule bg-white text-[13px] outline-none focus:border-rose transition-colors"
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           )

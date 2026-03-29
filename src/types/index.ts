@@ -60,6 +60,21 @@ export interface CountdownValues {
   seconds: number
 }
 
+// ─── Section Headings ─────────────────────────────────────────────────────────
+export interface SectionHeading {
+  eyebrow: string
+  heading: string
+  italic:  string
+}
+
+export interface SectionHeadings {
+  story:     SectionHeading
+  countdown: SectionHeading
+  details:   SectionHeading
+  gallery:   SectionHeading
+  rsvp:      SectionHeading
+}
+
 // ─── Story Chapter ────────────────────────────────────────────────────────────
 export interface StoryChapter {
   id:      number

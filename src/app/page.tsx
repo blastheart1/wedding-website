@@ -31,21 +31,36 @@ export default async function Home() {
 
       {/* Story — flowers visible at bottom while scrolling through */}
       <div className="relative overflow-visible">
-        <Story bgUrl={config.storyBgUrl || undefined} chapters={config.storyChapters} />
+        <Story
+          bgUrl={config.storyBgUrl || undefined}
+          chapters={config.storyChapters}
+          heading={config.sectionHeadings.story}
+        />
         <FlowersBox flowers={STORY_FLOWERS} />
       </div>
 
       {/* Countdown — flowers at bottom edges */}
       <div className="relative overflow-visible">
-        <Countdown config={config} bgUrl={config.countdownBgUrl || undefined} />
+        <Countdown
+          config={config}
+          bgUrl={config.countdownBgUrl || undefined}
+          heading={config.sectionHeadings.countdown}
+        />
         <FlowersBox flowers={COUNTDOWN_FLOWERS} />
       </div>
 
-      <Details config={config} bgUrl={config.detailsBgUrl || undefined} />
+      <Details
+        config={config}
+        bgUrl={config.detailsBgUrl || undefined}
+        heading={config.sectionHeadings.details}
+      />
 
-      <Gallery bgUrl={config.galleryBgUrl || undefined} />
+      <Gallery
+        bgUrl={config.galleryBgUrl || undefined}
+        heading={config.sectionHeadings.gallery}
+      />
 
-      <RSVPSection config={config} />
+      <RSVPSection config={config} heading={config.sectionHeadings.rsvp} />
       <Footer config={config} />
     </main>
   )

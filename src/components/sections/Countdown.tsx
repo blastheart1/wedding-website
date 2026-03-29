@@ -4,12 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import type { CountdownValues } from '@/types'
 import type { PublicConfig }    from '@/lib/config'
-import { SectionHeader }        from '@/components/ui/SectionHeader'
-import { SectionBackground }    from '@/components/ui/SectionBackground'
+import { SectionHeader }           from '@/components/ui/SectionHeader'
+import { SectionBackground }       from '@/components/ui/SectionBackground'
+import type { SectionHeading }     from '@/types'
+import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 
 interface CountdownProps {
-  config: Pick<PublicConfig, 'weddingDate' | 'ceremonyTime'>
-  bgUrl?: string
+  config:   Pick<PublicConfig, 'weddingDate' | 'ceremonyTime'>
+  bgUrl?:   string
+  heading?: SectionHeading
 }
 
 function getTimeLeft(weddingDate: string, ceremonyTime: string): CountdownValues {
@@ -56,7 +59,7 @@ function FlipDigit({ value }: { value: string }) {
   )
 }
 
-export function Countdown({ config, bgUrl }: CountdownProps) {
+export function Countdown({ config, bgUrl, heading = DEFAULT_SECTION_HEADINGS.countdown }: CountdownProps) {
   const { weddingDate, ceremonyTime } = config
 
   const [values, setValues] = useState<CountdownValues>(() =>
@@ -88,7 +91,7 @@ export function Countdown({ config, bgUrl }: CountdownProps) {
     >
       <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender" />
       <div className="relative z-10">
-      <SectionHeader eyebrow="Counting down" heading="Until we say" headingItalic="forever" />
+      <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
 
       <motion.div
         ref={ref}

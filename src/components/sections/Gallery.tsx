@@ -6,10 +6,11 @@ import {
   motion, useScroll, useTransform, useSpring, useInView, AnimatePresence,
   type MotionValue,
 } from 'framer-motion'
-import { SectionHeader }    from '@/components/ui/SectionHeader'
-import { SectionBackground } from '@/components/ui/SectionBackground'
-import { fadeIn }            from '@/lib/animations'
-import type { GalleryPhotoData } from '@/types'
+import { SectionHeader }          from '@/components/ui/SectionHeader'
+import { SectionBackground }      from '@/components/ui/SectionBackground'
+import { fadeIn }                  from '@/lib/animations'
+import type { GalleryPhotoData, SectionHeading } from '@/types'
+import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 import clsx from 'clsx'
 
 // ─── Gallery flower overlay — fixed-position, scroll-driven ──────────────────
@@ -220,7 +221,7 @@ function StackProgress({
 }
 
 // ─── Main Gallery ─────────────────────────────────────────────────────────────
-export function Gallery({ bgUrl }: { bgUrl?: string }) {
+export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: { bgUrl?: string; heading?: SectionHeading }) {
   const [photos,   setPhotos]   = useState<GalleryPhotoData[]>([])
   const [loading,  setLoading]  = useState(true)
   const [lightbox, setLightbox] = useState<number | null>(null)
@@ -307,9 +308,9 @@ export function Gallery({ bgUrl }: { bgUrl?: string }) {
           {/* Section header — visible at top of sticky viewport */}
           <div className="relative z-10 shrink-0 pt-16 pb-4">
             <SectionHeader
-              eyebrow="Luis & Bee"
-              heading="Moments we"
-              headingItalic="cherish"
+              eyebrow={heading.eyebrow}
+              heading={heading.heading}
+              headingItalic={heading.italic}
             />
           </div>
 

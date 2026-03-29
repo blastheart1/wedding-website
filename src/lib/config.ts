@@ -1,6 +1,6 @@
 import { getDb, schema } from './db'
-import { DEFAULT_CONFIG, STORY_CHAPTERS } from './constants'
-import type { StoryChapter } from '@/types'
+import { DEFAULT_CONFIG, STORY_CHAPTERS, DEFAULT_SECTION_HEADINGS } from './constants'
+import type { StoryChapter, SectionHeadings } from '@/types'
 
 // ─── Public shape — all fields guaranteed non-null ────────────────────────────
 export interface PublicConfig {
@@ -26,7 +26,9 @@ export interface PublicConfig {
   detailsBgUrl:   string
   galleryBgUrl:   string
   // Editable story chapter text (caption, stamp, emoji)
-  storyChapters:  StoryChapter[]
+  storyChapters:   StoryChapter[]
+  // Editable section heading text
+  sectionHeadings: SectionHeadings
 }
 
 /**
@@ -62,13 +64,14 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         countdownBgUrl: (row.countdownBgUrl ?? DEFAULT_CONFIG.countdownBgUrl).trim(),
         detailsBgUrl:   (row.detailsBgUrl   ?? DEFAULT_CONFIG.detailsBgUrl).trim(),
         galleryBgUrl:   (row.galleryBgUrl   ?? DEFAULT_CONFIG.galleryBgUrl).trim(),
-        storyChapters:  parseStoryChapters(row.storyChapters),
+        storyChapters:   parseStoryChapters(row.storyChapters),
+        sectionHeadings: parseSectionHeadings(row.sectionHeadings),
       }
     }
   } catch {
     // DB unavailable (e.g. no DATABASE_URL in CI/build) — use defaults
   }
-  return { ...DEFAULT_CONFIG, storyChapters: STORY_CHAPTERS } as PublicConfig
+  return { ...DEFAULT_CONFIG, storyChapters: STORY_CHAPTERS, sectionHeadings: DEFAULT_SECTION_HEADINGS } as PublicConfig
 }
 
 function parseStoryChapters(raw: string | null | undefined): StoryChapter[] {
@@ -80,5 +83,22 @@ function parseStoryChapters(raw: string | null | undefined): StoryChapter[] {
       : STORY_CHAPTERS
   } catch {
     return STORY_CHAPTERS
+  }
+}
+
+function parseSectionHeadings(raw: string | null | undefined): SectionHeadings {
+  if (!raw) return DEFAULT_SECTION_HEADINGS
+  try {
+    const parsed = JSON.parse(raw) as Partial<SectionHeadings>
+    // Merge with defaults so new sections added later still work
+    return {
+      story:     { ...DEFAULT_SECTION_HEADINGS.story,     ...parsed.story     },
+      countdown: { ...DEFAULT_SECTION_HEADINGS.countdown, ...parsed.countdown },
+      details:   { ...DEFAULT_SECTION_HEADINGS.details,   ...parsed.details   },
+      gallery:   { ...DEFAULT_SECTION_HEADINGS.gallery,   ...parsed.gallery   },
+      rsvp:      { ...DEFAULT_SECTION_HEADINGS.rsvp,      ...parsed.rsvp      },
+    }
+  } catch {
+    return DEFAULT_SECTION_HEADINGS
   }
 }

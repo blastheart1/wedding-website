@@ -72,6 +72,8 @@ export const weddingConfig = pgTable('wedding_config', {
   galleryBgUrl:    text('gallery_bg_url'),
   // Story chapter text (JSON string: StoryChapter[]) — editable from admin
   storyChapters:   text('story_chapters'),
+  // Section heading text (JSON string: SectionHeadings) — editable from admin
+  sectionHeadings: text('section_headings'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 })
 
