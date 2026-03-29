@@ -1,5 +1,6 @@
 import { getDb, schema } from './db'
-import { DEFAULT_CONFIG } from './constants'
+import { DEFAULT_CONFIG, STORY_CHAPTERS } from './constants'
+import type { StoryChapter } from '@/types'
 
 // ─── Public shape — all fields guaranteed non-null ────────────────────────────
 export interface PublicConfig {
@@ -24,6 +25,8 @@ export interface PublicConfig {
   countdownBgUrl: string
   detailsBgUrl:   string
   galleryBgUrl:   string
+  // Editable story chapter text (caption, stamp, emoji)
+  storyChapters:  StoryChapter[]
 }
 
 /**
@@ -59,10 +62,23 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         countdownBgUrl: (row.countdownBgUrl ?? DEFAULT_CONFIG.countdownBgUrl).trim(),
         detailsBgUrl:   (row.detailsBgUrl   ?? DEFAULT_CONFIG.detailsBgUrl).trim(),
         galleryBgUrl:   (row.galleryBgUrl   ?? DEFAULT_CONFIG.galleryBgUrl).trim(),
+        storyChapters:  parseStoryChapters(row.storyChapters),
       }
     }
   } catch {
     // DB unavailable (e.g. no DATABASE_URL in CI/build) — use defaults
   }
-  return { ...DEFAULT_CONFIG } as PublicConfig
+  return { ...DEFAULT_CONFIG, storyChapters: STORY_CHAPTERS } as PublicConfig
+}
+
+function parseStoryChapters(raw: string | null | undefined): StoryChapter[] {
+  if (!raw) return STORY_CHAPTERS
+  try {
+    const parsed = JSON.parse(raw) as StoryChapter[]
+    return Array.isArray(parsed) && parsed.length === STORY_CHAPTERS.length
+      ? parsed
+      : STORY_CHAPTERS
+  } catch {
+    return STORY_CHAPTERS
+  }
 }

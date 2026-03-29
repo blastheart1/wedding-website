@@ -5,14 +5,16 @@ import Image from 'next/image'
 import { motion, useInView } from 'framer-motion'
 import { STORY_CHAPTERS } from '@/lib/constants'
 import { SectionHeader } from '@/components/ui/SectionHeader'
-import type { StoryPhotoData } from '@/types'
+import { SectionBackground } from '@/components/ui/SectionBackground'
+import type { StoryPhotoData, StoryChapter } from '@/types'
 import clsx from 'clsx'
 
 interface StoryProps {
-  bgUrl?: string
+  bgUrl?:    string
+  chapters?: StoryChapter[]
 }
 
-export function Story({ bgUrl }: StoryProps) {
+export function Story({ bgUrl, chapters = STORY_CHAPTERS }: StoryProps) {
   const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-100px' })
   const [storyPhotos, setStoryPhotos] = useState<StoryPhotoData[]>([])
@@ -30,23 +32,7 @@ export function Story({ bgUrl }: StoryProps) {
 
   return (
     <section id="story" className="relative py-24 px-6">
-      {/* Background: image + overlay, or plain color fallback */}
-      {bgUrl ? (
-        <>
-          <div className="absolute inset-0">
-            <Image
-              src={bgUrl}
-              alt="Story section background"
-              fill
-              className="object-cover"
-              sizes="100vw"
-            />
-          </div>
-          <div className="absolute inset-0 bg-white/65" />
-        </>
-      ) : (
-        <div className="absolute inset-0 bg-petal" />
-      )}
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-petal" parallax />
 
       <div className="relative z-10">
         <SectionHeader eyebrow="Luis & Bee" heading="A story worth" headingItalic="telling" />
@@ -56,7 +42,7 @@ export function Story({ bgUrl }: StoryProps) {
           className="grid grid-cols-2 sm:grid-cols-3 gap-0 max-w-[860px] mx-auto justify-items-center"
           style={{ perspective: '1200px' }}
         >
-          {STORY_CHAPTERS.map((chapter) => {
+          {chapters.map((chapter) => {
             const deg   = parseFloat(chapter.rotate)
             const photo = photoBySlot.get(chapter.id)
             return (

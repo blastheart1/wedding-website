@@ -70,6 +70,8 @@ export const weddingConfig = pgTable('wedding_config', {
   countdownBgUrl:  text('countdown_bg_url'),
   detailsBgUrl:    text('details_bg_url'),
   galleryBgUrl:    text('gallery_bg_url'),
+  // Story chapter text (JSON string: StoryChapter[]) — editable from admin
+  storyChapters:   text('story_chapters'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 })
 

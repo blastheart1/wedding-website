@@ -135,7 +135,7 @@ export function AdminPanel() {
         <GalleryTab />
       )}
       {tab === 'story' && (
-        <StoryTab />
+        <StoryTab config={config} setConfig={setConfig} onSave={saveConfig} />
       )}
     </div>
   )
@@ -706,19 +706,53 @@ function GalleryTab() {
 
 // ─── Story tab ────────────────────────────────────────────────────────────────
 const STORY_SLOTS = [
-  { slot: 1, label: 'Chapter I',    stamp: 'The beginning of everything'    },
-  { slot: 2, label: 'Chapter II',   stamp: 'Adventures, big and small'      },
-  { slot: 3, label: 'Chapter III',  stamp: 'Exploring the world together'   },
-  { slot: 4, label: 'Chapter IV',   stamp: 'Every season, better together'  },
-  { slot: 5, label: 'The Proposal', stamp: 'He asked. She said yes.'        },
-  { slot: 6, label: 'Chapter ∞',   stamp: 'Feb 27, 2027 — forever begins'  },
+  { slot: 1, label: 'Chapter I'    },
+  { slot: 2, label: 'Chapter II'   },
+  { slot: 3, label: 'Chapter III'  },
+  { slot: 4, label: 'Chapter IV'   },
+  { slot: 5, label: 'The Proposal' },
+  { slot: 6, label: 'Chapter ∞'  },
 ]
 
-function StoryTab() {
+const DEFAULT_CHAPTERS = [
+  { id: 1, emoji: '☕', caption: 'The beginning of everything',    stamp: 'Chapter I',    bg: 'bg-petal',    rotate: '-4',   delay: 0   },
+  { id: 2, emoji: '🌿', caption: 'Adventures, big and small',     stamp: 'Chapter II',   bg: 'bg-sage',     rotate: '2.5',  delay: 140 },
+  { id: 3, emoji: '✈️', caption: 'Exploring the world together',  stamp: 'Chapter III',  bg: 'bg-lavender', rotate: '-1.5', delay: 280 },
+  { id: 4, emoji: '🎉', caption: 'Every season, better together', stamp: 'Chapter IV',   bg: 'bg-peach',    rotate: '3.5',  delay: 80  },
+  { id: 5, emoji: '💍', caption: 'He asked. She said yes.',       stamp: 'The Proposal', bg: 'bg-blush',    rotate: '-5',   delay: 220 },
+  { id: 6, emoji: '🌸', caption: 'Feb 27, 2027 — forever begins', stamp: 'Chapter ∞',    bg: 'bg-sage',     rotate: '4',    delay: 360 },
+]
+
+function StoryTab({
+  config,
+  setConfig,
+  onSave,
+}: {
+  config:    Partial<WeddingConfig>
+  setConfig: (c: Partial<WeddingConfig>) => void
+  onSave:    () => void
+}) {
   const router    = useRouter()
   const [photos,    setPhotos]    = useState<GalleryPhoto[]>([])
   const [uploading, setUploading] = useState<number | null>(null)
   const fileRefs  = useRef<Record<number, HTMLInputElement | null>>({})
+
+  // Parse saved chapter text from config; fall back to hardcoded defaults
+  const savedChapters = (() => {
+    try {
+      const raw = config.storyChapters as string | undefined
+      if (!raw) return DEFAULT_CHAPTERS
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) && parsed.length === 6 ? parsed : DEFAULT_CHAPTERS
+    } catch {
+      return DEFAULT_CHAPTERS
+    }
+  })()
+
+  const updateChapter = (id: number, field: 'caption' | 'stamp' | 'emoji', value: string) => {
+    const next = savedChapters.map(c => c.id === id ? { ...c, [field]: value } : c)
+    setConfig({ ...config, storyChapters: JSON.stringify(next) })
+  }
 
   const loadPhotos = useCallback(async () => {
     const res  = await fetch('/api/admin/story', { credentials: cred })
@@ -802,6 +836,50 @@ function StoryTab() {
 
   return (
     <div className="space-y-5">
+      {/* ── Chapter Text Editor ────────────────────────────────────────── */}
+      <div className="bg-white border border-rule p-6">
+        <h4 className="text-[9px] tracking-[3px] uppercase text-rose mb-2">✏️ Chapter Text</h4>
+        <p className="text-[11px] text-muted italic mb-5">
+          Edit the caption, stamp date, and emoji for each chapter card.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          {STORY_SLOTS.map(({ slot, label }) => {
+            const ch = savedChapters.find(c => c.id === slot) ?? DEFAULT_CHAPTERS[slot - 1]
+            return (
+              <div key={slot} className="border border-rule bg-cream p-3 space-y-2">
+                <p className="text-[11px] font-medium text-ink">{label}</p>
+                <div>
+                  <label className="block text-[9px] tracking-[1.5px] uppercase text-muted mb-1">Emoji</label>
+                  <input
+                    value={ch.emoji}
+                    onChange={e => updateChapter(slot, 'emoji', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-rule bg-white text-[13px] outline-none focus:border-rose transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] tracking-[1.5px] uppercase text-muted mb-1">Caption</label>
+                  <input
+                    value={ch.caption}
+                    onChange={e => updateChapter(slot, 'caption', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-rule bg-white text-[13px] outline-none focus:border-rose transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] tracking-[1.5px] uppercase text-muted mb-1">Stamp</label>
+                  <input
+                    value={ch.stamp}
+                    onChange={e => updateChapter(slot, 'stamp', e.target.value)}
+                    className="w-full px-2 py-1.5 border border-rule bg-white text-[13px] outline-none focus:border-rose transition-colors"
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <SaveButton onSave={onSave} />
+      </div>
+
+      {/* ── Story Photos ───────────────────────────────────────────────── */}
       <div className="bg-white border border-rule p-6">
         <h4 className="text-[9px] tracking-[3px] uppercase text-rose mb-2">📸 Story Photos</h4>
         <p className="text-[11px] text-muted italic mb-5">
@@ -809,15 +887,16 @@ function StoryTab() {
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {STORY_SLOTS.map(({ slot, label, stamp }) => {
-            const photo = photoBySlot.get(slot)
+          {STORY_SLOTS.map(({ slot, label }) => {
+            const photo   = photoBySlot.get(slot)
+            const caption = savedChapters.find(c => c.id === slot)?.caption ?? ''
             return (
               <div key={slot} className="border border-rule bg-cream p-3">
                 {/* Slot header */}
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="text-[11px] font-medium text-ink">{label}</p>
-                    <p className="text-[10px] text-muted italic truncate">{stamp}</p>
+                    <p className="text-[10px] text-muted italic truncate">{caption}</p>
                   </div>
                 </div>
 

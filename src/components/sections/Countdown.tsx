@@ -86,7 +86,7 @@ export function Countdown({ config, bgUrl }: CountdownProps) {
       id="countdown"
       className="relative py-28 px-6 text-center border-y border-lilac/20"
     >
-      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender" />
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender" parallax />
       <div className="relative z-10">
       <SectionHeader eyebrow="Counting down" heading="Until we say" headingItalic="forever" />
 

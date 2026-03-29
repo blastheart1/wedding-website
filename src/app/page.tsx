@@ -31,7 +31,7 @@ export default async function Home() {
 
       {/* Story — flowers visible at bottom while scrolling through */}
       <div className="relative overflow-visible">
-        <Story bgUrl={config.storyBgUrl || undefined} />
+        <Story bgUrl={config.storyBgUrl || undefined} chapters={config.storyChapters} />
         <FlowersBox flowers={STORY_FLOWERS} />
       </div>
 

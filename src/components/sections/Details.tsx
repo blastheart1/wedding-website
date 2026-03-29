@@ -98,7 +98,7 @@ export function Details({ config, bgUrl }: DetailsProps) {
 
   return (
     <section id="details" className="relative py-24 px-6">
-      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream" />
+      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream" parallax />
       <div className="relative z-10">
       <SectionHeader eyebrow="Event Details" heading="Mark your" headingItalic="calendar" />
 
