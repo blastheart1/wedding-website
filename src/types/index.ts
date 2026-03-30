@@ -3,11 +3,18 @@ export interface RSVPFormData {
   name:        string
   email:       string
   attending:   'yes' | 'no'
-  meal:        string
+  dietary:     string
   songRequest: string
-  plusOne:     boolean
-  plusOneName: string
   message:     string
+}
+
+export type RSVPAccessMode = 'open' | 'invite_only' | 'mixed'
+
+export interface GuestVerification {
+  allowed: boolean
+  seats:   number | null
+  name:    string | null
+  reason?: 'blocked' | 'not_invited' | 'already_rsvped'
 }
 
 export interface RSVPResponse {
@@ -72,6 +79,7 @@ export interface SectionHeadings {
   countdown: SectionHeading
   details:   SectionHeading
   gallery:   SectionHeading
+  faq:       SectionHeading
   rsvp:      SectionHeading
 }
 

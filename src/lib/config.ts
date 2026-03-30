@@ -19,12 +19,16 @@ export interface PublicConfig {
   guestNotes:     string
   rsvpDeadline:   string
   heroVideoUrl:   string
-  // F4: per-section background images
+  // Per-section background images
   heroBgUrl:      string
   storyBgUrl:     string
   countdownBgUrl: string
   detailsBgUrl:   string
   galleryBgUrl:   string
+  faqBgUrl:       string
+  rsvpBgUrl:      string
+  // RSVP access control
+  rsvpAccessMode: string
   // Editable story chapter text (caption, stamp, emoji)
   storyChapters:   StoryChapter[]
   // Editable section heading text
@@ -64,6 +68,9 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
         countdownBgUrl: (row.countdownBgUrl ?? DEFAULT_CONFIG.countdownBgUrl).trim(),
         detailsBgUrl:   (row.detailsBgUrl   ?? DEFAULT_CONFIG.detailsBgUrl).trim(),
         galleryBgUrl:   (row.galleryBgUrl   ?? DEFAULT_CONFIG.galleryBgUrl).trim(),
+        faqBgUrl:       (row.faqBgUrl       ?? DEFAULT_CONFIG.faqBgUrl).trim(),
+        rsvpBgUrl:      (row.rsvpBgUrl      ?? DEFAULT_CONFIG.rsvpBgUrl).trim(),
+        rsvpAccessMode: row.rsvpAccessMode  ?? DEFAULT_CONFIG.rsvpAccessMode,
         storyChapters:   parseStoryChapters(row.storyChapters),
         sectionHeadings: parseSectionHeadings(row.sectionHeadings),
       }
@@ -71,7 +78,11 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
   } catch {
     // DB unavailable (e.g. no DATABASE_URL in CI/build) — use defaults
   }
-  return { ...DEFAULT_CONFIG, storyChapters: STORY_CHAPTERS, sectionHeadings: DEFAULT_SECTION_HEADINGS } as PublicConfig
+  return {
+    ...DEFAULT_CONFIG,
+    storyChapters:   STORY_CHAPTERS,
+    sectionHeadings: DEFAULT_SECTION_HEADINGS,
+  } as PublicConfig
 }
 
 function parseStoryChapters(raw: string | null | undefined): StoryChapter[] {
@@ -96,6 +107,7 @@ function parseSectionHeadings(raw: string | null | undefined): SectionHeadings {
       countdown: { ...DEFAULT_SECTION_HEADINGS.countdown, ...parsed.countdown },
       details:   { ...DEFAULT_SECTION_HEADINGS.details,   ...parsed.details   },
       gallery:   { ...DEFAULT_SECTION_HEADINGS.gallery,   ...parsed.gallery   },
+      faq:       { ...DEFAULT_SECTION_HEADINGS.faq,       ...parsed.faq       },
       rsvp:      { ...DEFAULT_SECTION_HEADINGS.rsvp,      ...parsed.rsvp      },
     }
   } catch {

@@ -22,6 +22,9 @@ export const DEFAULT_CONFIG = {
   countdownBgUrl: '',
   detailsBgUrl:   '',
   galleryBgUrl:   '',
+  faqBgUrl:       '',
+  rsvpBgUrl:      '',
+  rsvpAccessMode: 'open' as const,
 }
 
 // ─── Story chapters (instax section) ─────────────────────────────────────────
@@ -41,23 +44,15 @@ export const DEFAULT_SECTION_HEADINGS: SectionHeadings = {
   countdown: { eyebrow: 'Counting down',  heading: 'Until we say',   italic: 'forever'  },
   details:   { eyebrow: 'Event Details',  heading: 'Mark your',      italic: 'calendar' },
   gallery:   { eyebrow: 'Luis & Bee',     heading: 'Moments we',     italic: 'cherish'  },
+  faq:       { eyebrow: 'Questions?',     heading: 'Everything you', italic: 'need to know' },
   rsvp:      { eyebrow: "You're invited", heading: 'Will you',       italic: 'join us?' },
 }
-
-// ─── Meal options for RSVP form ───────────────────────────────────────────────
-export const MEAL_OPTIONS = [
-  'No preference',
-  'Vegetarian',
-  'Vegan',
-  'Gluten-free',
-  'Halal',
-  'Kosher',
-]
 
 // ─── Nav links ────────────────────────────────────────────────────────────────
 export const NAV_LINKS = [
   { label: 'Story',   href: '#story'   },
   { label: 'Details', href: '#details' },
   { label: 'Gallery', href: '#gallery' },
+  { label: 'FAQ',     href: '#faq'     },
   { label: 'RSVP',   href: '#rsvp'    },
 ]
