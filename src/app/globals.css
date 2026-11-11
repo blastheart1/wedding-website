@@ -318,3 +318,58 @@ body:not(:has(#home)){padding-top:env(safe-area-inset-top)}
 @media(max-width:767px){.back-top-wrap{bottom:max(14px,calc(env(safe-area-inset-bottom) + 8px))}}
 .site-preloader-content{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .wedding-footer{padding-bottom:env(safe-area-inset-bottom)}
+
+/* ─── Footer corner peel: a folded page corner that reveals who made the site ─── */
+.corner-peel{position:absolute;right:0;bottom:0;width:calc(60px + var(--bounce,0px));height:calc(60px + var(--bounce,0px));padding:0;border:0;background:transparent;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;transition:width .35s cubic-bezier(.22,1,.36,1),height .35s cubic-bezier(.22,1,.36,1)}
+.corner-peel[data-pinned=true]{position:fixed}
+.corner-peel[data-bouncing=true]{transition:none;animation:none}
+.corner-peel:hover,.corner-peel:focus-visible{width:88px;height:88px}
+.corner-peel:focus-visible{outline:2px solid #fdfaf6;outline-offset:-6px}
+/* The page beneath, seen through the lifted corner. */
+.corner-peel-under{position:absolute;inset:0;background:#f7eee4;clip-path:polygon(100% 0,100% 100%,0 100%)}
+/* The corner itself, folded back: the lighter underside of the dark page, with a soft shadow along the fold. */
+.corner-peel-flap{position:absolute;inset:0;clip-path:polygon(0 100%,100% 0,0 0);background:linear-gradient(135deg,#4a3831 0%,#5f4a41 46%,#3a2a24 50%);filter:drop-shadow(-3px -3px 6px #0006)}
+@media (prefers-reduced-motion:no-preference){.corner-peel{animation:corner-peel-hint 7s ease-in-out 3s infinite}}
+@keyframes corner-peel-hint{0%,86%,100%{width:60px;height:60px}93%{width:74px;height:74px}}
+html[data-site-motion=reduced] .corner-peel{animation:none}
+
+.peel-dialog{--peel:0px;position:fixed;inset:0;z-index:1000;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;color:#2e1f1a;overflow:hidden;filter:drop-shadow(-8px -8px 22px #0007)}
+.peel-dialog::backdrop{background:transparent}
+/* The cream sheet is cut to a triangle in the bottom-right corner, which grows until it covers the screen. */
+.peel-dialog[data-open=true]{--peel:230vmax}
+.peel-sheet{position:absolute;inset:0;background:#f7eee4;clip-path:polygon(100% 100%,100% calc(100% - var(--peel)),calc(100% - var(--peel)) 100%);transition:clip-path .7s cubic-bezier(.45,0,.15,1)}
+.peel-flap{position:absolute;inset:0;pointer-events:none;background:#4a3831 linear-gradient(135deg,#4a3831 0%,#57433a 30%,#6a544a 46%,#3a2a24 50%) right bottom/var(--peel) var(--peel) no-repeat;clip-path:polygon(100% calc(100% - var(--peel)),calc(100% - var(--peel)) 100%,calc(100% - var(--peel)) calc(100% - var(--peel)));transition:clip-path .7s cubic-bezier(.45,0,.15,1)}
+.peel-dialog[data-stage=dragging] .peel-sheet,.peel-dialog[data-stage=dragging] .peel-flap{transition:none}
+.peel-dialog[data-stage=dragging]{touch-action:none}
+.peel-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;transition:opacity .5s ease}
+.peel-canvas[data-ready=true]{opacity:1}
+/* Soft bands of the paper colour at the top and bottom keep the words readable over the scene. */
+.peel-sheet::before,.peel-sheet::after{content:"";position:absolute;left:0;right:0;z-index:1;pointer-events:none}
+.peel-sheet::before{top:0;height:calc(210px + env(safe-area-inset-top));background:linear-gradient(#f7eee4 34%,#f7eee400)}
+.peel-sheet::after{bottom:0;height:calc(270px + env(safe-area-inset-bottom));background:linear-gradient(#f7eee400,#f7eee4 72%)}
+.peel-close,.peel-readout,.peel-controls,.peel-contact{z-index:2}
+.peel-close{position:absolute;top:calc(16px + env(safe-area-inset-top));right:calc(16px + env(safe-area-inset-right));display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;border-radius:50%;background:#2e1f1a14;color:#2e1f1a;cursor:pointer}
+.peel-close:focus-visible,.peel-tick:focus-visible,.peel-action:focus-visible,.peel-grind input:focus-visible,.peel-contact a:focus-visible{outline:2px solid #2e1f1a;outline-offset:3px}
+.peel-readout{position:absolute;left:0;right:0;top:calc(22px + env(safe-area-inset-top));display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 16px;text-align:center;pointer-events:none}
+.peel-caption{margin:0;padding:0 56px;min-height:1.15em;font-family:var(--font-cormorant);font-style:italic;font-size:clamp(24px,5vw,34px);line-height:1.15}
+.peel-numbers{display:flex;gap:16px;margin:0;font-family:var(--font-jost)}
+.peel-numbers div{display:flex;flex-direction:column;align-items:center;min-width:56px}
+.peel-numbers dt{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:#7a5c54}
+.peel-numbers dd{margin:2px 0 0;font-size:20px;font-variant-numeric:tabular-nums}
+.peel-controls{position:absolute;left:0;right:0;bottom:calc(78px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:12px;padding:0 20px;font-family:var(--font-jost);color:#2e1f1a}
+.peel-hint{margin:0;font-size:13px;line-height:1.35;text-align:center;color:#7a5c54}
+.peel-grind{display:flex;align-items:center;gap:10px;width:min(380px,100%)}
+.peel-grind-dial{flex:1;display:flex;flex-direction:column;min-width:0}
+.peel-grind-value{font-size:24px;line-height:1.1;text-align:center;font-variant-numeric:tabular-nums}
+.peel-grind input[type=range]{width:100%;height:32px;margin:0;accent-color:#2e1f1a;touch-action:pan-y}
+.peel-grind-ends{display:flex;justify-content:space-between;font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:#7a5c54}
+.peel-tick{flex:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border:0;border-radius:50%;background:#2e1f1a14;color:#2e1f1a;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.peel-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.peel-action{min-height:44px;padding:0 24px;border:0;border-radius:999px;background:#2e1f1a;font-family:var(--font-jost);font-size:15px;color:#fdfaf6;cursor:pointer;touch-action:manipulation}
+.peel-action[data-quiet=true]{background:#2e1f1a14;color:#2e1f1a}
+.peel-tick:disabled,.peel-action:disabled{opacity:.35;cursor:default}
+.peel-contact{position:absolute;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;margin:0;padding:0 20px;font-family:var(--font-jost);font-size:15px;color:#7a5c54}
+.peel-contact a{color:#2e1f1a;text-decoration:underline;text-underline-offset:5px}
+.peel-contact .peel-mail{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#2e1f1a14;text-decoration:none}
+@media (prefers-reduced-motion:reduce){.peel-sheet,.peel-flap,.peel-canvas{transition:none}}
+html[data-site-motion=reduced] .peel-sheet,html[data-site-motion=reduced] .peel-flap,html[data-site-motion=reduced] .peel-canvas{transition:none}

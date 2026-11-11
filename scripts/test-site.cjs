@@ -120,11 +120,35 @@ test('home: the hero buttons share one width', () => {
   assert.equal((hero.match(/className=[`"{]+flex w-full items-center justify-center/g) || []).length, 3)
 })
 
-test('home: the footer contact is one quiet line', () => {
+test('home: the maker\'s contact is tucked under the footer\'s folded corner', () => {
   const footer = read('src/components/sections/Footer.tsx')
-  assert.match(footer, /className="footer-note"/)
-  assert.ok(!/<h2[^>]*>Want something like this/.test(footer))
-  assert.match(read('src/app/globals.css'), /\.footer-note\{[^}]*font-size:13px[^}]*opacity:\.5/)
+  assert.match(footer, /<CornerPeel email=\{config\.presentation\.footerContactEmail\} url=\{config\.presentation\.footerContactUrl\} \/>/)
+  assert.ok(!/Want something like this|footer-note/.test(footer), 'the contact line is no longer printed on the footer itself')
+  const peel = read('src/components/footer/CornerPeel.tsx')
+  assert.match(peel, /aria-label="Peel back the corner of the page"/)
+  assert.match(peel, /<Mail size=\{18\}/, 'the email link is a mail icon')
+  assert.match(peel, /aria-label="Send an email"/, 'the icon has a spoken label')
+  assert.ok(!/>\s*Email\s*</.test(peel), 'the word Email is not shown')
+  assert.match(peel, /if \(!email && !url\) return null/, 'no corner when there is nothing to show')
+  assert.ok(!EMOJI.test(peel))
+  assert.match(peel, /prefers-reduced-motion/, 'reduced motion folds without animating')
+  assert.match(read('src/components/footer/useEspressoPlayer.ts'), /prefers-reduced-motion/, 'reduced motion shows each step as a still')
+  assert.match(peel, /onPointerDown=\{onPointerDown\}/, 'the corner can be dragged')
+  const bounce = read('src/components/footer/useCornerBounce.ts')
+  assert.match(peel, /useCornerBounce\(corner\)/)
+  assert.match(bounce, /window\.scrollY \+ window\.innerHeight - document\.documentElement\.scrollHeight/, 'the corner knows how far past its end the page is')
+  assert.match(bounce, /element\.style\.setProperty\('--bounce'/, 'the fold moves with the bounce')
+  assert.match(bounce, /target = -Math\.min\(MAX_PRESS,/, 'pulling past the end presses the fold flat first')
+  assert.match(bounce, /Math\.min\(MAX_LIFT, Math\.max\(-MAX_PRESS,/, 'it can spring open past its resting size, within limits')
+  assert.match(bounce, /reducedMotion\(\)/, 'no bounce with reduced motion')
+  for (const type of ['scroll', 'wheel', 'touchmove']) assert.ok(bounce.includes("addEventListener('" + type + "'") && bounce.includes("removeEventListener('" + type + "'"), type + ' is listened to and cleaned up')
+  assert.match(read('src/app/globals.css'), /\.corner-peel\{[^}]*width:calc\(60px \+ var\(--bounce,0px\)\)/)
+  assert.match(read('src/app/globals.css'), /\.corner-peel\[data-pinned=true\]\{position:fixed\}/, 'at the end of the page the corner stays in the corner of the screen through a bounce')
+  assert.match(peel, /state\.size >= DRAG_OPEN_PX \? 'open' : 'closing'/, 'a short drag folds back, a long one opens')
+  assert.match(peel, /if \(dragged\.current\) \{ dragged\.current = false; return \}/, 'the click that ends a drag is not a tap')
+  const css = read('src/app/globals.css')
+  assert.match(css, /\.corner-peel\{[^}]*touch-action:none/, 'dragging the corner does not scroll the page')
+  assert.match(css, /\.peel-dialog\[data-stage=dragging\] \.peel-sheet,\.peel-dialog\[data-stage=dragging\] \.peel-flap\{transition:none\}/, 'the fold tracks the finger without lag')
 })
 
 test('games: hidden unless switched on, and free of emoji and coloured borders', () => {
@@ -252,4 +276,138 @@ test('browser bars: the page draws edge to edge and floating controls respect th
     assert.ok(css.includes(rule), rule)
   }
   assert.match(read('src/components/sections/Navbar.tsx'), /'site-navbar fixed top-\[18px\]/)
+})
+
+// ─── Footer easter egg: the espresso recipe ───────────────────────────────────
+const espresso = load('src/lib/espresso.ts')
+
+test('espresso: 18 g in, 36 g out, in exactly 30 seconds', () => {
+  const { RECIPE, TIMELINE } = espresso
+  assert.deepEqual(plain(RECIPE), { doseGrams: 18, yieldGrams: 36, shotSeconds: 30 })
+  assert.equal(TIMELINE.shotEnd - TIMELINE.shotStart, espresso.SHOT_PLAY, 'the shot plays sped up')
+  assert.ok(TIMELINE.total <= 20, 'the whole story is brisk')
+  assert.equal(espresso.shotTime(0), TIMELINE.shotStart)
+  assert.equal(espresso.shotTime(30), TIMELINE.shotEnd)
+  assert.ok(Math.abs(espresso.shotClock(espresso.shotTime(12)) - 12) < 1e-9, 'clock and animation time convert both ways')
+  assert.equal(espresso.formatGrams(espresso.doseAt(TIMELINE.doseEnd)), '18.0')
+  assert.equal(espresso.formatGrams(espresso.doseAt(TIMELINE.total)), '18.0')
+  assert.equal(espresso.yieldAt(TIMELINE.shotStart), 0)
+  assert.equal(espresso.yieldAt(espresso.shotTime(espresso.FIRST_DROPS)), 0, 'nothing falls during pre-infusion')
+  assert.equal(espresso.formatGrams(espresso.yieldAt(TIMELINE.shotEnd)), '36.0')
+  assert.equal(espresso.formatGrams(espresso.yieldAt(TIMELINE.total)), '36.0', 'the scale holds at 36.0')
+  assert.equal(espresso.formatClock(espresso.shotClock(TIMELINE.shotEnd)), '0:30')
+  assert.equal(espresso.formatClock(espresso.shotClock(TIMELINE.total)), '0:30', 'the clock stops at 0:30')
+  assert.equal(espresso.shotClock(0), 0)
+})
+
+test('espresso: the yield only ever rises and the flow starts and ends at nothing', () => {
+  const { TIMELINE } = espresso
+  let previous = -1
+  for (let time = 0; time <= TIMELINE.total; time += 0.05) {
+    const grams = espresso.yieldAt(time)
+    assert.ok(grams >= previous - 1e-9 && grams <= 36 + 1e-9, `yield at ${time.toFixed(1)}s`)
+    previous = grams
+    const flow = espresso.flowAt(time)
+    assert.ok(flow >= 0 && flow <= 1)
+    if (time < espresso.shotTime(espresso.FIRST_DROPS) || time >= TIMELINE.shotEnd) assert.equal(flow, 0, `no flow at ${time.toFixed(2)}s`)
+  }
+  assert.ok(espresso.flowAt(espresso.shotTime(15)) > 0.95, 'a full stream mid-shot')
+  assert.ok(espresso.blondingAt(espresso.shotTime(8)) < espresso.blondingAt(espresso.shotTime(28)))
+})
+
+test('espresso: latte art and readouts follow the storyboard', () => {
+  const { TIMELINE: T } = espresso
+  assert.deepEqual([T.artStart - 1, T.artStart, (T.artStart + T.artEnd) / 2, T.artEnd, 99].map(espresso.artProgress), [0, 0, 0.5, 1, 1])
+  assert.deepEqual([0, 7.9, 59, 61, 125, -4].map(espresso.formatClock), ['0:00', '0:07', '0:59', '1:01', '2:05', '0:00'])
+  assert.deepEqual([0, 17.96, 36, 35.94, -2].map(espresso.formatGrams), ['0.0', '18.0', '36.0', '35.9', '0.0'])
+})
+
+test('espresso: the camera glides through every key without a jump or a stop', () => {
+  const { CAMERA, cameraAt, TIMELINE } = espresso
+  for (let index = 1; index < CAMERA.length; index++) assert.ok(CAMERA[index].time > CAMERA[index - 1].time, 'keys are in order')
+  assert.equal(CAMERA[CAMERA.length - 1].time, TIMELINE.total, 'the storyboard covers the whole animation')
+  assert.deepEqual(plain(cameraAt(0)), plain(CAMERA[0]))
+  assert.deepEqual(plain(cameraAt(999).target), plain(CAMERA[CAMERA.length - 1].target))
+  for (const key of CAMERA) {
+    const at = cameraAt(key.time)
+    for (let axis = 0; axis < 3; axis++) assert.ok(Math.abs(at.target[axis] - key.target[axis]) < 1e-9, `passes through the key at ${key.time}s`)
+  }
+  const gap = (a, b) => Math.hypot(a.target[0] - b.target[0], a.target[1] - b.target[1], a.target[2] - b.target[2]) + Math.abs(a.span - b.span)
+  for (let time = 0; time < TIMELINE.total; time += 0.05) {
+    assert.ok(gap(cameraAt(time), cameraAt(time + 0.05)) < 0.12, `no jump at ${time.toFixed(2)}s`)
+    assert.ok(cameraAt(time).span > 0.3 && cameraAt(time).rise > 0.3, 'the frame never collapses')
+  }
+  // Mid-story keys are passed at speed: the camera is still moving a moment either side of them.
+  const middle = CAMERA[3].time
+  assert.ok(gap(cameraAt(middle - 0.05), cameraAt(middle + 0.05)) > 1e-4, 'no stop at a key')
+})
+
+test('espresso: the scene is built from the downloaded models, loaded only when peeled', () => {
+  const scene = read('src/world/coffee/espresso-scene.ts'), assets = read('src/world/coffee/assets.ts')
+  const MODELS = ['machine', 'latte-cup', 'espresso-cup', 'pitcher', 'grinder']
+  for (const name of MODELS) {
+    const file = path.join(root, 'public/wedding/coffee', name + '.glb')
+    assert.ok(fs.existsSync(file), name + '.glb is shipped')
+    assert.ok(assets.includes("'" + name + "'"), name + ' is loaded')
+    assert.equal(fs.readFileSync(file).subarray(0, 4).toString(), 'glTF')
+  }
+  const total = MODELS.reduce((sum, name) => sum + fs.statSync(path.join(root, 'public/wedding/coffee', name + '.glb')).size, 0)
+  assert.ok(total < 1.3 * 1024 * 1024, 'the five models stay under 1.3 MB together, was ' + total)
+  assert.ok(!/RoundedBoxGeometry|LatheGeometry|TorusGeometry/.test(scene), 'the machine, cups and pitcher are not built from primitives')
+  assert.ok(!fs.existsSync(path.join(root, 'src/world/coffee/latte-art.ts')), 'the latte art is the photographed rosetta, not a drawing')
+  assert.match(read('src/components/footer/useEspressoPlayer.ts'), /import\('@\/world\/coffee\/espresso-scene'\)/, 'three.js and the models load on demand')
+  assert.ok(!read('src/lib/loading/assets.ts').includes('coffee'), 'the easter egg is not part of the first load')
+})
+
+// ─── Footer easter egg: dialling in the grind ─────────────────────────────────
+test('grind game: the sweet spot gives 36 g and a score of 100, and only a tick either side does too', () => {
+  const { yieldForGrind, scoreFor, verdictFor, formatRatio, formatGrams } = espresso
+  for (const sweet of [250, 402, 500, 750]) {
+    assert.equal(formatGrams(yieldForGrind(sweet, sweet)), '36.0')
+    assert.equal(scoreFor(yieldForGrind(sweet, sweet)), 100)
+    assert.equal(verdictFor(yieldForGrind(sweet, sweet)), 'perfect')
+    assert.equal(formatRatio(yieldForGrind(sweet, sweet)), '1:2.0')
+    for (const off of [-1, 1]) assert.equal(scoreFor(yieldForGrind(sweet + off, sweet)), 100, 'one tick off still counts')
+    for (const off of [-3, 3]) assert.ok(scoreFor(yieldForGrind(sweet + off, sweet)) < 100, 'three ticks off does not')
+  }
+})
+
+test('grind game: coarser always runs fuller, finer chokes, and the hints point the right way', () => {
+  const { GRIND, yieldForGrind, scoreFor, verdictFor, clampGrind } = espresso
+  let previous = 0
+  for (let tick = GRIND.min; tick <= GRIND.max; tick++) {
+    const grams = yieldForGrind(tick, 480)
+    assert.ok(grams >= previous, 'yield never falls as the grind coarsens, at ' + tick)
+    assert.ok(grams >= 2 && grams <= 90, 'yield stays within what a cup can show')
+    const score = scoreFor(grams)
+    assert.ok(Number.isInteger(score) && score >= 0 && score <= 100)
+    previous = grams
+  }
+  assert.equal(verdictFor(yieldForGrind(600, 480)), 'fast')
+  assert.equal(verdictFor(yieldForGrind(300, 480)), 'slow')
+  assert.equal(scoreFor(yieldForGrind(1000, 250)), 0, 'far too coarse scores nothing')
+  assert.ok(scoreFor(yieldForGrind(470, 480)) > scoreFor(yieldForGrind(440, 480)), 'closer scores higher')
+  assert.deepEqual([-5, 0, 499.6, 1000, 4000].map(clampGrind), [0, 0, 500, 1000, 1000])
+  assert.equal(yieldForGrind(-50, 480), yieldForGrind(0, 480), 'out-of-range ticks are clamped')
+})
+
+test('grind game: the sweet spot is hidden, varies per visit, and can always be reached', () => {
+  const { GRIND, pickSweetSpot, yieldAt, flowAt, shotTime, TIMELINE } = espresso
+  assert.deepEqual([0, 0.5, 1, -3, 9].map(pickSweetSpot), [250, 500, 750, 250, 750])
+  for (const random of [0, 0.123, 0.5, 0.999]) {
+    const sweet = pickSweetSpot(random)
+    assert.ok(Number.isInteger(sweet) && sweet > GRIND.min && sweet < GRIND.max)
+  }
+  // The shot on screen ends at whatever the grind gave, and a choked shot only drips.
+  assert.equal(espresso.formatGrams(yieldAt(TIMELINE.shotEnd, 56.6)), '56.6')
+  assert.ok(flowAt(shotTime(15), 72) > flowAt(shotTime(15), 36), 'a fast shot gushes')
+  assert.ok(flowAt(shotTime(15), 3) < 0.12, 'a choked shot never forms a stream')
+  const game = read('src/components/footer/EspressoGame.tsx')
+  assert.match(game, /pickSweetSpot\(Math\.random\(\)\)/)
+  assert.ok(!/sweetSpot\.current\}/.test(game), 'the sweet spot is never rendered')
+  assert.match(game, /type="range" min=\{GRIND\.min\} max=\{GRIND\.max\} step=\{1\}/, 'every one of the 1000 ticks can be chosen')
+  assert.match(game, /aria-label="One tick finer"/)
+  assert.match(game, /aria-label="One tick coarser"/)
+  assert.match(game, />Done<\/button>/, 'Done moves on to brewing')
+  assert.ok(!EMOJI.test(game))
 })
