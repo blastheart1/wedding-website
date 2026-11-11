@@ -140,6 +140,27 @@ export const COUNTDOWN_FLOWERS: FlowerDef[] = [
   },
 ]
 
+export const FAQ_FLOWERS: FlowerDef[] = [
+  {
+    src: '/flowers/s3-flower-left.png',
+    alt: 'Flower left',
+    side: 'left', edge: '-3%', top: '50%', width: 'clamp(80px, 12vw, 180px)',
+    startX: 65, startY: 15, startRotate: -10,
+  },
+  {
+    src: '/flowers/home-petals-left.png',
+    alt: 'Petals left lower',
+    side: 'left', edge: '4%', top: '75%', width: 'clamp(55px, 7vw, 100px)',
+    startX: 40, startY: 20, startRotate: -15,
+  },
+  {
+    src: '/flowers/s2-flower-right.png',
+    alt: 'Flower right',
+    side: 'right', edge: '-2%', top: '45%', width: 'clamp(90px, 13vw, 200px)',
+    startX: 65, startY: 10, startRotate: 12,
+  },
+]
+
 export const GALLERY_FLOWERS: FlowerDef[] = [
   {
     src: '/flowers/home-petals-left.png',

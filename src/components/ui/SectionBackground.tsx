@@ -14,7 +14,7 @@ interface SectionBackgroundProps {
 export function SectionBackground({
   imageUrl,
   fallbackColor,
-  overlayClass = 'bg-white/65',
+  overlayClass = 'bg-transparent',
 }: SectionBackgroundProps) {
   if (!imageUrl) {
     return <div className={`absolute inset-0 ${fallbackColor}`} />

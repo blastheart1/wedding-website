@@ -1,61 +1,76 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, schema } from '@/lib/db'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { createRsvpRateLimiter, denialMessages, rsvpEligibility, rsvpSchema } from '@/lib/rsvp-policy'
 
-const rsvpSchema = z.object({
-  name:        z.string().min(2, 'Name must be at least 2 characters').max(255),
-  email:       z.string().email('Please enter a valid email').max(255),
-  attending:   z.enum(['yes', 'no']),
-  meal:        z.string().max(100).optional(),
-  songRequest: z.string().max(255).optional(),
-  plusOne:     z.boolean().optional(),
-  plusOneName: z.string().max(255).optional(),
-  message:     z.string().max(2000).optional(),
-})
+const isRateLimited = createRsvpRateLimiter()
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const data = rsvpSchema.parse(body)
-    const db   = getDb()
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  if (isRateLimited(ip)) {
+    return NextResponse.json(
+      { success: false, message: 'Too many attempts. Please try again in a minute.' },
+      { status: 429, headers: { 'Retry-After': '60' } },
+    )
+  }
 
-    const [rsvp] = await db
-      .insert(schema.rsvps)
-      .values({
-        name:        data.name,
-        email:       data.email.toLowerCase(),
-        attending:   data.attending === 'yes',
-        meal:        data.meal,
-        songRequest: data.songRequest,
-        plusOne:     data.plusOne ?? false,
-        plusOneName: data.plusOneName,
-        message:     data.message,
-      })
-      .returning()
+  try {
+    const data = rsvpSchema.parse(await request.json())
+    const db = getDb()
+
+    // Never trust a prior browser verification or submitted seats/access flags.
+    // Reload the current invitation policy immediately before the insert.
+    const [guestRows, existing, configs] = await Promise.all([
+      db.select({ status: schema.guestList.status, seats: schema.guestList.seats, name: schema.guestList.name })
+        .from(schema.guestList).where(eq(schema.guestList.email, data.email)).limit(1),
+      db.select({ id: schema.rsvps.id })
+        .from(schema.rsvps).where(eq(schema.rsvps.email, data.email)).limit(1),
+      db.select({ rsvpAccessMode: schema.weddingConfig.rsvpAccessMode })
+        .from(schema.weddingConfig).limit(1),
+    ])
+
+    const eligibility = rsvpEligibility(guestRows[0] ?? null, existing.length > 0, configs[0]?.rsvpAccessMode ?? 'open')
+    if (!eligibility.allowed) {
+      const reason = eligibility.reason ?? 'not_invited'
+      return NextResponse.json(
+        { success: false, message: denialMessages[reason], reason },
+        { status: reason === 'already_rsvped' ? 409 : 403 },
+      )
+    }
+
+    const [rsvp] = await db.insert(schema.rsvps).values({
+      name: data.name,
+      email: data.email,
+      attending: data.attending === 'yes',
+      dietary: data.dietary,
+      songRequest: data.songRequest,
+      message: data.message,
+    }).returning()
 
     return NextResponse.json({
       success: true,
-      message: "RSVP received! We can't wait to celebrate with you.",
-      id:      rsvp.id,
+      message: data.attending === 'yes'
+        ? "RSVP received! We can't wait to celebrate with you."
+        : 'Thank you for letting us know. Your response has been received.',
+      id: rsvp.id,
     })
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError || error instanceof SyntaxError) {
       return NextResponse.json(
-        { success: false, message: error.errors[0].message },
+        { success: false, message: error instanceof z.ZodError ? error.errors[0].message : 'Invalid JSON request.' },
         { status: 400 },
       )
     }
 
-    // Unique-constraint violation → duplicate email
-    const msg = error instanceof Error ? error.message : ''
-    if (msg.includes('rsvps_email_unique') || msg.includes('unique')) {
+    // The unique index also protects simultaneous submissions.
+    const dbError = error as { code?: string; message?: string }
+    if (dbError?.code === '23505' || dbError?.message?.includes('rsvps_email_unique')) {
       return NextResponse.json(
-        { success: false, message: "You've already RSVPed with this email. Email us if you need to make changes." },
+        { success: false, message: denialMessages.already_rsvped, reason: 'already_rsvped' },
         { status: 409 },
       )
     }
-
-    console.error('RSVP error:', error)
     return NextResponse.json(
       { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 },

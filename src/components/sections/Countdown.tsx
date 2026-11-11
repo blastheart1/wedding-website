@@ -1,49 +1,32 @@
 'use client'
 
+import {weddingTimeLeft as getTimeLeft} from '@/lib/wedding-time'
+import {useWorldMotion} from '@/lib/site-motion'
+import type {NightMode} from '@/world/night-scene'
+
 import { useEffect, useRef, useState } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import type { CountdownValues } from '@/types'
 import type { PublicConfig }    from '@/lib/config'
 import { SectionHeader }           from '@/components/ui/SectionHeader'
-import { SectionBackground }       from '@/components/ui/SectionBackground'
 import type { SectionHeading }     from '@/types'
 import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 
 interface CountdownProps {
-  config:   Pick<PublicConfig, 'weddingDate' | 'ceremonyTime'>
-  bgUrl?:   string
+  config:   Pick<PublicConfig, 'weddingDate' | 'ceremonyTime' | 'partner1' | 'partner2'>
   heading?: SectionHeading
 }
 
-function getTimeLeft(weddingDate: string, ceremonyTime: string): CountdownValues {
-  // Parse ceremony time (e.g. "3:00 PM")
-  const [timePart, period] = ceremonyTime.split(' ')
-  const [hRaw, mRaw]       = (timePart ?? '15:00').split(':').map(Number)
-  let hours = hRaw
-  if (period === 'PM' && hours !== 12) hours += 12
-  if (period === 'AM' && hours === 12) hours = 0
-
-  const [year, month, day] = weddingDate.split('-').map(Number)
-  const target = new Date(year, month - 1, day, hours, mRaw ?? 0, 0)
-  const diff   = Math.max(target.getTime() - Date.now(), 0)
-
-  return {
-    days:    Math.floor(diff / 86_400_000),
-    hours:   Math.floor((diff % 86_400_000) / 3_600_000),
-    minutes: Math.floor((diff % 3_600_000)  / 60_000),
-    seconds: Math.floor((diff % 60_000)     / 1_000),
-  }
-}
 
 function pad(n: number) {
   return String(n).padStart(2, '0')
 }
 
 // Flip digit — animates out old value, in new value
-function FlipDigit({ value }: { value: string }) {
+function FlipDigit({ value, reduced }: { value: string, reduced: boolean }) {
   return (
     <div className="relative overflow-hidden" style={{ minWidth: '1ch', paddingBottom: '0.12em' }}>
-      <AnimatePresence mode="popLayout" initial={false}>
+      {reduced?<span className="block">{value}</span>:<AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={value}
           initial={{ y: '-60%', opacity: 0 }}
@@ -54,19 +37,23 @@ function FlipDigit({ value }: { value: string }) {
         >
           {value}
         </motion.span>
-      </AnimatePresence>
+      </AnimatePresence>}
     </div>
   )
 }
 
-export function Countdown({ config, bgUrl, heading = DEFAULT_SECTION_HEADINGS.countdown }: CountdownProps) {
+export function Countdown({ config, heading = DEFAULT_SECTION_HEADINGS.countdown }: CountdownProps) {
   const { weddingDate, ceremonyTime } = config
+  const {reduced,paused}=useWorldMotion()
+  const [nightMode,setNightMode]=useState<NightMode>('stargaze')
+  useEffect(()=>{window.dispatchEvent(new Event('wedding-world-control'))},[nightMode])
 
   const [values, setValues] = useState<CountdownValues>(() =>
-    getTimeLeft(weddingDate, ceremonyTime),
+    ({days:0,hours:0,minutes:0,seconds:0}),
   )
 
   useEffect(() => {
+    setValues(getTimeLeft(weddingDate, ceremonyTime))
     const id = setInterval(
       () => setValues(getTimeLeft(weddingDate, ceremonyTime)),
       1000,
@@ -87,46 +74,51 @@ export function Countdown({ config, bgUrl, heading = DEFAULT_SECTION_HEADINGS.co
   return (
     <section
       id="countdown"
-      className="relative py-28 px-6 text-center border-y border-lilac/20"
+      className="countdown-section"
     >
-      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender" />
-      <div className="relative z-10">
+      <div className="countdown-copy">
       <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
 
       <motion.div
         ref={ref}
-        className="flex justify-center flex-wrap mt-4"
-        initial="hidden"
-        animate={inView ? 'visible' : 'hidden'}
+        className="countdown-grid"
+        initial={reduced?false:"hidden"}
+        animate={reduced||inView ? 'visible' : 'hidden'}
         variants={{
           hidden:  {},
-          visible: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
+          visible: { transition: { staggerChildren: reduced?0:0.1, delayChildren: reduced?0:0.1 } },
         }}
       >
         {units.map((u) => (
           <motion.div
             key={u.label}
             variants={{
-              hidden:  { opacity: 0, y: 24 },
-              visible: { opacity: 1, y: 0,  transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] } },
+              hidden:  { opacity: reduced?1:0, y: reduced?0:24 },
+              visible: { opacity: 1, y: 0,  transition: { duration: reduced?0:0.8, ease: [0.22, 1, 0.36, 1] } },
             }}
-            className="px-8 md:px-10 border-r border-lilac/30 last:border-r-0"
+            className="min-w-0"
           >
             <div
-              className="font-display font-light text-lilac flex justify-center"
-              style={{ fontSize: 'clamp(52px, 8vw, 84px)', lineHeight: 1.1 }}
+              className="countdown-numerals"
             >
               {u.value.split('').map((digit, i) => (
-                <FlipDigit key={i} value={digit} />
+                <FlipDigit key={i} value={digit} reduced={reduced||paused} />
               ))}
             </div>
-            <span className="text-[9px] tracking-[4px] uppercase text-muted mt-2 block">
+            <span className="countdown-label">
               {u.label}
             </span>
           </motion.div>
         ))}
       </motion.div>
       </div>
+      <div id="countdown-night-scene" className="countdown-world scene-viewport" data-wedding-scene="night" data-night-mode={nightMode} role="img" aria-label={nightMode==='dance'?`${config.partner1} and ${config.partner2} dance together beneath the moon and stars.`:`${config.partner1} and ${config.partner2} sit together beneath the moon and stars.`}><div className="world-canvas-slot" aria-hidden="true" /></div>
+      <p className="night-scene-caption">Together under the stars</p>
+      <div className="night-scene-options" role="group" aria-label="Choose the couple’s night scene" aria-controls="countdown-night-scene">
+        <button type="button" aria-pressed={nightMode==='stargaze'} onClick={()=>setNightMode('stargaze')}>Stargazing</button>
+        <button type="button" aria-pressed={nightMode==='dance'} onClick={()=>setNightMode('dance')}>Dancing</button>
+      </div>
+      <span className="sr-only" role="status">{nightMode==='dance'?'Dancing scene selected.':'Stargazing scene selected.'} {reduced?'Reduced motion: a still pose is shown.':paused?'Motion is paused.':''}</span>
     </section>
   )
 }

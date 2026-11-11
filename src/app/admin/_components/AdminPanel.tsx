@@ -22,11 +22,15 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import type { RSVP, WeddingConfig, GalleryPhoto } from '@/lib/schema'
 import clsx from 'clsx'
+import { parseSitePresentation, type SitePresentation } from '@/lib/presentation'
+import { FAQTab }       from './FAQTab'
+import { GuestListTab } from './GuestListTab'
+import { QuizTab }      from './QuizTab'
 
 /** Ensures the httpOnly admin session cookie is always sent. */
 const cred: RequestCredentials = 'include'
 
-type Tab = 'settings' | 'rsvps' | 'gallery' | 'story'
+type Tab = 'settings' | 'rsvps' | 'gallery' | 'story' | 'faq' | 'guests' | 'quiz'
 
 export function AdminPanel() {
   const router = useRouter()
@@ -39,12 +43,13 @@ export function AdminPanel() {
     const res  = await fetch('/api/admin', { credentials: cred })
     const json = await res.json()
     if (res.ok) {
+      if (json.warning) toast.warning(json.warning)
       setRsvps(json.rsvps   ?? [])
       setConfig(json.config ?? {})
       setStats(json.stats   ?? { total: 0, attending: 0, declining: 0 })
     } else {
-      toast.error('Session expired — please log in again')
-      router.push('/admin/login')
+      toast.error(json.error ?? 'Unable to load settings')
+      if (res.status === 401) router.push('/admin/login')
     }
   }, [router])
 
@@ -61,7 +66,8 @@ export function AdminPanel() {
       toast.success('Settings saved!')
       router.refresh()
     } else {
-      toast.error('Save failed')
+      const error = await res.json().catch(() => ({}))
+      toast.error(error.error ?? 'Save failed')
     }
   }
 
@@ -100,6 +106,9 @@ export function AdminPanel() {
     rsvps:    `RSVPs (${stats.total})`,
     gallery:  'Gallery',
     story:    'Story',
+    faq:      'FAQ',
+    guests:   'Guest List',
+    quiz:     'Quiz',
   }
 
   return (
@@ -111,11 +120,17 @@ export function AdminPanel() {
           <p className="text-[12px] text-muted mt-1">Wedding management</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          {(['settings', 'rsvps', 'gallery', 'story'] as Tab[]).map(t => (
+          {(['settings', 'rsvps', 'gallery', 'story', 'faq', 'guests', 'quiz'] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={tabClass(t)}>
               {TAB_LABELS[t]}
             </button>
           ))}
+          <a
+            href="/admin/invitations"
+            className="px-5 py-2 text-[10px] tracking-[2px] uppercase border border-rule bg-white text-ink hover:bg-petal transition-colors"
+          >
+            Invitations
+          </a>
           <button
             onClick={logout}
             className="px-5 py-2 text-[10px] tracking-[2px] uppercase border border-rule bg-white text-muted hover:bg-petal transition-colors ml-2"
@@ -137,6 +152,9 @@ export function AdminPanel() {
       {tab === 'story' && (
         <StoryTab config={config} setConfig={setConfig} onSave={saveConfig} />
       )}
+      {tab === 'faq'    && <FAQTab />}
+      {tab === 'guests' && <GuestListTab />}
+      {tab === 'quiz'   && <QuizTab />}
     </div>
   )
 }
@@ -207,10 +225,64 @@ function SettingsTab({
         </div>
         <SaveButton onSave={onSave} />
       </Card>
+      <Card title="🎟️ RSVP Access">
+        <div className="mb-3">
+          <label className="block text-[11px] text-muted mb-1">Access Mode</label>
+          <select
+            value={(config.rsvpAccessMode as string) ?? 'open'}
+            onChange={e => setConfig({ ...config, rsvpAccessMode: e.target.value })}
+            className="w-full px-3 py-2 border border-rule bg-cream text-[13px] text-ink outline-none focus:border-rose focus:bg-white transition-colors"
+          >
+            <option value="open">Open — anyone can RSVP</option>
+            <option value="invite_only">Invite only — whitelist required</option>
+            <option value="mixed">Mixed — whitelist gets priority, others can still RSVP</option>
+          </select>
+          <p className="text-[11px] text-muted italic mt-1">
+            Manage the guest list (whitelist/blacklist &amp; seat counts) in the Guest List tab.
+          </p>
+        </div>
+        <SaveButton onSave={onSave} />
+      </Card>
+      <PresentationCard config={config} setConfig={setConfig} onSave={onSave} />
       <SectionBgCard config={config} setConfig={setConfig} onSave={onSave} />
       <SectionHeadingsCard config={config} setConfig={setConfig} onSave={onSave} />
     </div>
   )
+}
+
+function PresentationCard({ config, setConfig, onSave }: {
+  config: Partial<WeddingConfig>
+  setConfig: (c: Partial<WeddingConfig>) => void
+  onSave: () => void
+}) {
+  const presentation = parseSitePresentation(config.sitePresentation)
+  const update = (patch: Partial<SitePresentation>) => setConfig({ ...config, sitePresentation: JSON.stringify({ ...presentation, ...patch }) })
+  const labels: Array<[Exclude<keyof SitePresentation, 'ceremonyImages'>, string]> = [
+    ['ceremonyAlias', 'Church short name'], ['ceremonyAddress', 'Ceremony address'],
+    ['ceremonyMapUrl', 'Directions URL (HTTPS)'], ['ceremonyMapEmbedUrl', 'Google Maps embed URL'],
+    ['receptionNote', 'Reception note'], ['dressDescription', 'Dress code description'],
+    ['dressRestrictions', 'Dress code restrictions'], ['footerContactEmail', 'Footer contact email'],
+    ['footerContactUrl', 'Footer website URL (HTTPS)'],
+  ]
+  const inputClass = 'w-full px-3 py-2 border border-rule bg-cream text-[13px] text-ink focus:border-rose'
+  return <Card title="Ceremony, attire & footer" className="md:col-span-2">
+    <p className="text-[11px] text-muted mb-4">Revision-11 defaults appear until customized. Saving preserves all other settings. Empty fields hide optional content.</p>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {labels.map(([key, label]) => <label key={key} className="block text-[11px] text-muted">{label}
+        <textarea className={inputClass} value={presentation[key]} onChange={event => update({ [key]: event.target.value })} rows={key.includes('Description') || key.includes('Restrictions') || key.includes('Address') ? 3 : 2} />
+      </label>)}
+    </div>
+    <h5 className="text-sm mt-5 mb-2">Ceremony photographs</h5>
+    {presentation.ceremonyImages.map((photo, index) => <fieldset key={index} className="border border-rule p-3 mb-3">
+      <legend className="text-xs">Photo {index + 1}</legend>
+      {(['src', 'alt', 'label'] as const).map(key => <label key={key} className="block text-[11px] text-muted mb-2">{{ src: 'Image URL or local /path', alt: 'Image description (accessibility)', label: 'Thumbnail label' }[key]}
+        <input className={inputClass} value={photo[key]} onChange={event => update({ ceremonyImages: presentation.ceremonyImages.map((item, i) => i === index ? { ...item, [key]: event.target.value } : item) })} />
+      </label>)}
+      <button type="button" className="text-xs text-rose" onClick={() => update({ ceremonyImages: presentation.ceremonyImages.filter((_, i) => i !== index) })}>Remove photo</button>
+    </fieldset>)}
+    {presentation.ceremonyImages.length < 12 && <button type="button" className="text-xs text-rose mr-4" onClick={() => update({ ceremonyImages: [...presentation.ceremonyImages, { src: '/wedding/church-1.jpg', alt: '', label: 'Church photo' }] })}>Add photo</button>}
+    <SaveButton onSave={onSave} />
+  </Card>
 }
 
 // ─── Section background image upload card ────────────────────────────────────
@@ -220,6 +292,7 @@ const BG_SECTIONS = [
   { key: 'countdownBgUrl' as keyof WeddingConfig, label: 'Countdown', hint: 'Behind the flip-clock numbers' },
   { key: 'detailsBgUrl'   as keyof WeddingConfig, label: 'Details',   hint: 'Event details section' },
   { key: 'galleryBgUrl'   as keyof WeddingConfig, label: 'Gallery',   hint: 'Behind the photo stack' },
+  { key: 'faqBgUrl'       as keyof WeddingConfig, label: 'FAQ',       hint: 'Behind the FAQ accordion' },
 ]
 
 function SectionBgCard({
@@ -340,16 +413,18 @@ const HEADING_SECTIONS = [
   { key: 'story',     label: 'Story'    },
   { key: 'countdown', label: 'Countdown'},
   { key: 'details',   label: 'Details'  },
+  { key: 'faq',       label: 'FAQ'      },
   { key: 'gallery',   label: 'Gallery'  },
   { key: 'rsvp',      label: 'RSVP'    },
 ] as const
 
 const DEFAULT_HEADINGS_ADMIN = {
-  story:     { eyebrow: 'Luis & Bee',     heading: 'A story worth',  italic: 'telling'  },
-  countdown: { eyebrow: 'Counting down',  heading: 'Until we say',   italic: 'forever'  },
-  details:   { eyebrow: 'Event Details',  heading: 'Mark your',      italic: 'calendar' },
-  gallery:   { eyebrow: 'Luis & Bee',     heading: 'Moments we',     italic: 'cherish'  },
-  rsvp:      { eyebrow: "You're invited", heading: 'Will you',       italic: 'join us?' },
+  story:     { eyebrow: 'Luis & Bee',     heading: 'A story worth',  italic: 'telling'      },
+  countdown: { eyebrow: 'Counting down',  heading: 'Until we say',   italic: 'forever'      },
+  details:   { eyebrow: 'Event Details',  heading: 'Mark your',      italic: 'calendar'     },
+  gallery:   { eyebrow: 'Luis & Bee',     heading: 'Moments we',     italic: 'cherish'      },
+  faq:       { eyebrow: 'Questions?',     heading: 'Everything you', italic: 'need to know' },
+  rsvp:      { eyebrow: "You're invited", heading: 'Will you',       italic: 'join us?'     },
 }
 
 function SectionHeadingsCard({
@@ -369,6 +444,7 @@ function SectionHeadingsCard({
         countdown: { ...DEFAULT_HEADINGS_ADMIN.countdown, ...p.countdown },
         details:   { ...DEFAULT_HEADINGS_ADMIN.details,   ...p.details   },
         gallery:   { ...DEFAULT_HEADINGS_ADMIN.gallery,   ...p.gallery   },
+        faq:       { ...DEFAULT_HEADINGS_ADMIN.faq,       ...p.faq       },
         rsvp:      { ...DEFAULT_HEADINGS_ADMIN.rsvp,      ...p.rsvp      },
       }
     } catch {
@@ -453,7 +529,7 @@ function RSVPsTab({ rsvps, stats, onExport }: {
         <table className="w-full border-collapse bg-white border border-rule text-[13px]">
           <thead>
             <tr className="bg-petal">
-              {['#','Name','Email','Attending','Meal','Song','Plus One','Date'].map(h => (
+              {['#','Name','Email','Attending','Dietary','Song','Date'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-[9px] tracking-[2.5px] uppercase text-muted border-b border-rule font-normal">
                   {h}
                 </th>
@@ -472,7 +548,7 @@ function RSVPsTab({ rsvps, stats, onExport }: {
                 <tr key={r.id} className="border-b border-rule last:border-b-0 hover:bg-cream transition-colors">
                   <td className="px-4 py-3 text-muted">{i + 1}</td>
                   <td className="px-4 py-3 font-medium">{r.name}</td>
-                  <td className="px-4 py-3 text-ink2">{r.email}</td>
+                  <td className="px-4 py-3 text-ink2">{r.email ?? 'No email'}</td>
                   <td className="px-4 py-3">
                     <span className={clsx(
                       'px-3 py-1 text-[9px] tracking-[1.5px] uppercase font-medium',
@@ -481,9 +557,10 @@ function RSVPsTab({ rsvps, stats, onExport }: {
                       {r.attending ? 'Yes' : 'No'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-ink2">{r.meal        ?? '—'}</td>
+                  <td className="px-4 py-3 text-ink2 max-w-[160px] truncate" title={r.dietary ?? r.meal ?? undefined}>
+                    {r.dietary ?? r.meal ?? '—'}
+                  </td>
                   <td className="px-4 py-3 text-ink2">{r.songRequest ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink2">{r.plusOne ? `Yes — ${r.plusOneName ?? ''}` : 'No'}</td>
                   <td className="px-4 py-3 text-muted whitespace-nowrap">
                     {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </td>
