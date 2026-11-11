@@ -68,6 +68,16 @@ test('loading: a guest can never be trapped behind the welcome', () => {
   assert.match(css, /@keyframes site-preloader-failsafe\{to\{visibility:hidden/)
 })
 
+test('loading: a reload opens onto the top of the page, not where it was scrolled to', () => {
+  const preloader = read('src/components/loading/SitePreloader.tsx')
+  assert.match(preloader, /history\.scrollRestoration = 'manual'/)
+  // The page scrolls smoothly by default; the jump to the top must not be animated behind the doors.
+  assert.match(preloader, /window\.scrollTo\(\{ top: 0, behavior: 'instant' \}\)/)
+  // An address that names a place (#rsvp, #details) is left alone.
+  assert.match(preloader, /!window\.location\.hash/)
+  assert.match(preloader, /history\.scrollRestoration = previousRestoration/)
+})
+
 test('loading: site artwork is cached by the browser', () => {
   const config = require(path.join(root, 'next.config.js'))
   return config.headers().then(rules => {

@@ -41,6 +41,16 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     const root = document.documentElement
     const previousOverflow = root.style.overflow
     root.style.overflow = 'hidden'
+    // A reload normally puts the page back where it was scrolled to, which would open the
+    // doors onto the middle of the site. The welcome always leads to the top, unless the
+    // address asks for a particular place (#rsvp, #details and so on).
+    const previousRestoration = history.scrollRestoration
+    history.scrollRestoration = 'manual'
+    const toTop = () => { if (!window.location.hash && window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'instant' }) }
+    toTop()
+    // Some browsers put the old position back only once everything has loaded.
+    window.addEventListener('load', toTop)
+    window.addEventListener('pageshow', toTop)
 
     const skipTimer = window.setTimeout(() => setOfferSkip(true), TIMING.offerSkipAfterMs)
     const capTimer = window.setTimeout(() => open.current(), TIMING.hardCapMs)
@@ -54,6 +64,9 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     return () => {
       window.clearTimeout(skipTimer)
       window.clearTimeout(capTimer)
+      window.removeEventListener('load', toTop)
+      window.removeEventListener('pageshow', toTop)
+      history.scrollRestoration = previousRestoration
       root.style.overflow = previousOverflow
     }
   }, [returning])
