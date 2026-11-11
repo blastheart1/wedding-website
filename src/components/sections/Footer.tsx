@@ -5,6 +5,7 @@ import { motion, useInView } from 'framer-motion'
 import type { PublicConfig } from '@/lib/config'
 import { stagger, fadeUp, fadeIn } from '@/lib/animations'
 import {useWorldMotion} from '@/lib/site-motion'
+import { CornerPeel } from '@/components/footer/CornerPeel'
 
 interface FooterProps {
   config: Pick<PublicConfig, 'partner1' | 'partner2' | 'weddingDate' | 'location' | 'presentation'>
@@ -32,7 +33,7 @@ export function Footer({ config }: FooterProps) {
   const inView = useInView(ref, { once: true, margin: '-40px' })
 
   return (
-    <footer className="wedding-footer bg-ink text-white text-center px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
+    <footer className="wedding-footer relative bg-ink text-white text-center px-6 overflow-hidden min-h-screen flex flex-col items-center justify-center">
       <motion.div
         ref={ref}
         variants={stagger(reduced?0:0.12, 0)}
@@ -58,12 +59,8 @@ export function Footer({ config }: FooterProps) {
         )}
 
       </motion.div>
-      {/* One quiet line for the maker's contact, never competing with the names above. */}
-      {(config.presentation.footerContactEmail || config.presentation.footerContactUrl) && <p className="footer-note">
-        <span>Want something like this?</span>
-        {config.presentation.footerContactUrl && <a href={config.presentation.footerContactUrl} target="_blank" rel="noopener noreferrer">{config.presentation.footerContactUrl.replace(/^https:\/\//, '')}</a>}
-        {config.presentation.footerContactEmail && <a href={`mailto:${config.presentation.footerContactEmail}`}>Email</a>}
-      </p>}
+      {/* The maker's contact is tucked under a folded corner, out of the way of the names above. */}
+      <CornerPeel email={config.presentation.footerContactEmail} url={config.presentation.footerContactUrl} />
     </footer>
   )
 }
