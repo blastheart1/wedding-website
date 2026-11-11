@@ -8,6 +8,7 @@ import { inviteStore, loadInviteSettings } from '@/lib/invitations/store'
 import { renderTemplate } from '@/lib/invitations/settings'
 import { formatWeddingDate, siteBaseUrl, templateValues } from '@/lib/invitations/format'
 import type { InviteView } from '@/lib/invitations/types'
+import { previewSizedImage } from '@/lib/share-preview'
 import { InviteExperience } from './_components/InviteExperience'
 import { InviteUnavailable } from './_components/InviteUnavailable'
 
@@ -58,8 +59,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     ...shared,
     title,
     description,
-    openGraph: { title, description, type: 'website', images: [{ url: image, width: 1200, height: 630, alt: title }] },
-    twitter: { card: 'summary_large_image', title, description, images: [image] },
+    openGraph: { title, description, type: 'website', locale: 'en_PH', siteName: `${config.partner1} & ${config.partner2}`, images: [{ url: previewSizedImage(image), width: 1200, height: 630, alt: title }] },
+    twitter: { card: 'summary_large_image', title, description, images: [previewSizedImage(image)] },
   }
 }
 

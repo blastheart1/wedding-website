@@ -3,9 +3,9 @@
 import { parseSitePresentation, type SitePresentation } from '@/lib/presentation'
 import type { AdminConfig } from '@/app/admin/_lib/useAdminConfig'
 import { Button, Group, Row } from '@/app/admin/_ui/primitives'
-import { TextRow, ToggleRow } from '@/app/admin/_ui/forms'
+import { ImageRow, TextRow, ToggleRow } from '@/app/admin/_ui/forms'
 
-type TextKey = Exclude<keyof SitePresentation, 'ceremonyImages' | 'showGames'>
+type TextKey = Exclude<keyof SitePresentation, 'ceremonyImages' | 'showGames' | 'shareImageUrl'>
 
 const MAX_PHOTOS = 12
 
@@ -44,6 +44,12 @@ export function PresentationGroups({ config, setConfig }: PresentationGroupsProp
       <Group label="Footer">
         {text('footerContactEmail', 'Contact email')}
         {text('footerContactUrl', 'Website address (https)')}
+      </Group>
+
+      <Group label="Link preview" footnote="What Messenger, Facebook, Instagram and other apps show when the site address is shared. Leave everything empty to use your names and date on the wedding card. Apps keep old previews for a while, so a change can take time to appear.">
+        <ImageRow label="Picture" hint="A wide photo works best; it is cropped to 1200 by 630." url={presentation.shareImageUrl} folder="wedding/preview" onChange={shareImageUrl => update({ shareImageUrl })} />
+        {text('shareTitle', 'Title (optional)')}
+        {text('shareDescription', 'Description (optional)', 2)}
       </Group>
 
       <Group label="Games">

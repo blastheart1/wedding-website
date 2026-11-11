@@ -139,3 +139,65 @@ test('games: hidden unless switched on, and free of emoji and coloured borders',
   assert.ok(!EMOJI.test(games))
   assert.ok(!/border-rose|hover:border-|Challenge your guests|→|←/.test(games))
 })
+
+// ─── How the site appears when shared or saved ────────────────────────────────
+const share = load('src/lib/share-preview.ts')
+const shareInput = { partner1: 'Luis', partner2: 'Bee', date: 'February 27, 2027', title: '', description: '', imageUrl: '', baseUrl: 'https://www.luisandbee.wedding' }
+
+test('link preview: automatic card uses the names, the date and an absolute PNG address', () => {
+  const preview = share.sharePreview(shareInput)
+  assert.deepEqual(plain(preview), {
+    title: 'Luis & Bee',
+    description: 'We are getting married on February 27, 2027. Join us to celebrate.',
+    url: 'https://www.luisandbee.wedding/',
+    image: { url: 'https://www.luisandbee.wedding/preview-image', type: 'image/png', width: 1200, height: 630, alt: 'Luis & Bee, February 27, 2027' },
+  })
+  assert.ok(!EMOJI.test(JSON.stringify(preview)))
+})
+
+test('link preview: custom wording and an uploaded photo replace the automatic card', () => {
+  const photo = 'https://res.cloudinary.com/demo/image/upload/v1700000000/wedding/preview/us.png'
+  const preview = share.sharePreview({ ...shareInput, title: '  Luis and Bee say I do  ', description: ' Save the date. ', imageUrl: photo })
+  assert.equal(preview.title, 'Luis and Bee say I do')
+  assert.equal(preview.description, 'Save the date.')
+  assert.equal(preview.image.url, 'https://res.cloudinary.com/demo/image/upload/c_fill,g_auto,w_1200,h_630,f_jpg,q_auto/v1700000000/wedding/preview/us.png')
+  assert.equal(preview.image.type, 'image/jpeg')
+  assert.equal(share.sharePreview({ ...shareInput, title: '   ', imageUrl: '  ' }).title, 'Luis & Bee', 'blank values fall back to the automatic card')
+})
+
+test('link preview: photos are cropped once, and other addresses are left alone', () => {
+  const sized = share.previewSizedImage('https://res.cloudinary.com/demo/image/upload/v1/a.webp')
+  assert.equal(sized, 'https://res.cloudinary.com/demo/image/upload/c_fill,g_auto,w_1200,h_630,f_jpg,q_auto/v1/a.webp')
+  assert.equal(share.previewSizedImage(sized), sized, 'never stacks a second crop')
+  for (const other of ['https://example.com/photo.jpg', 'https://www.luisandbee.wedding/i/abc/preview-image', 'https://res.cloudinary.com/demo/video/upload/v1/a.mp4', '']) {
+    assert.equal(share.previewSizedImage(other), other)
+  }
+})
+
+test('site identity: icon sizes and names come from the couple', () => {
+  assert.deepEqual(plain(share.siteIdentity(' luis ', 'Bee')), { name: ' luis  & Bee', shortName: 'L & B', monogram: 'L&B', background: '#FDFAF6', ink: '#2E1F1A' })
+  assert.equal(share.siteIdentity('', 'Bee').monogram, 'B')
+  assert.deepEqual([32, 180, 192, 512, 64, 0, NaN, 5000].map(share.isIconSize), [true, true, true, true, false, false, false, false])
+})
+
+test('site identity: every page gets the icon, the manifest and a proper preview picture', () => {
+  const layout = read('src/app/layout.tsx')
+  assert.ok(!EMOJI.test(layout), 'no emoji in the preview title')
+  assert.ok(!/garland\.webp/.test(layout), 'the WebP preview picture is gone')
+  for (const expected of ["url: '/preview-image'", "'/app-icon/32'", "'/app-icon/180'", "locale:      'en_PH'", 'appleWebApp']) assert.ok(layout.includes(expected), expected)
+  assert.match(read('src/app/page.tsx'), /alternates: \{ canonical: preview\.url \}/)
+  const manifest = read('src/app/manifest.ts')
+  for (const expected of ["display: 'standalone'", "'/app-icon/192'", "'/app-icon/512'", "purpose: 'maskable'"]) assert.ok(manifest.includes(expected), expected)
+  const config = require(path.join(root, 'next.config.js'))
+  return config.redirects().then(rules => assert.deepEqual(plain(rules), [{ source: '/favicon.ico', destination: '/app-icon/32', permanent: false }]))
+})
+
+test('site identity: preview settings are part of the validated site settings', () => {
+  const { DEFAULT_PRESENTATION, sitePresentationSchema, parseSitePresentation } = load('src/lib/presentation.ts')
+  assert.deepEqual([DEFAULT_PRESENTATION.shareTitle, DEFAULT_PRESENTATION.shareDescription, DEFAULT_PRESENTATION.shareImageUrl], ['', '', ''])
+  assert.equal(parseSitePresentation(JSON.stringify({ receptionNote: 'older saved value' })).shareImageUrl, '')
+  assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareImageUrl: 'javascript:alert(1)' }).success, false)
+  assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareImageUrl: 'http://insecure.example/x.jpg' }).success, false)
+  assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareTitle: 'x'.repeat(121) }).success, false)
+  assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareImageUrl: 'https://res.cloudinary.com/demo/image/upload/v1/a.jpg', shareTitle: 'Us' }).success, true)
+})
