@@ -78,7 +78,7 @@ export function Navbar({ config }: NavbarProps) {
       {/* ── Positioning wrapper — pure CSS, no Framer Motion ─────────────── */}
       <div
         className={clsx(
-          'fixed top-[18px] z-[900] pointer-events-none',
+          'site-navbar fixed top-[18px] z-[900] pointer-events-none',
           // Mobile: 16 px gutter each side — no overflow, no transform needed
           'left-4 right-4',
           // Desktop: auto-width pill centered via left-50% + translateX(-50%)

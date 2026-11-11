@@ -29,12 +29,10 @@ function Content({ config }: { config: PublicConfig }) {
     if (!hero) return
     const observer = new IntersectionObserver(([entry]) => setBackTop(!entry.isIntersecting))
     observer.observe(hero)
-    // Load the 3D engine only as a scene approaches the viewport.
-    const scenes = new IntersectionObserver(entries => {
-      if (entries.some(entry => entry.isIntersecting)) { setWorldReady(true); scenes.disconnect() }
-    }, { rootMargin: '500px' })
-    document.querySelectorAll('[data-wedding-scene]').forEach(scene => scenes.observe(scene))
-    return () => { observer.disconnect(); scenes.disconnect() }
+    // Start the 3D engine straight away, while the welcome screen is still up, so its
+    // setup and shader compilation never happen in the middle of a scroll.
+    setWorldReady(true)
+    return () => observer.disconnect()
   }, [])
   useEffect(() => {
     const trap = (event: KeyboardEvent) => {

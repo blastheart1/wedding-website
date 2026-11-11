@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {useWorldMotion} from '@/lib/site-motion'
 import {backgrounds} from '@/extra-assets'
+import {backgroundVideoUrl} from '@/lib/media'
 import type { PublicConfig } from '@/lib/config'
 
 interface HeroProps {
@@ -80,7 +81,11 @@ export function Hero({ config }: HeroProps) {
             preload="auto"
             className="absolute inset-0 w-full h-full object-cover"
             aria-hidden="true"
-            src={heroVideoUrl}
+            // Lets the status bar colour be read from the video. The video host allows it.
+            crossOrigin="anonymous"
+            data-hero-video="true"
+            // A lighter, silent copy for the background; the story player below keeps the original.
+            src={backgroundVideoUrl(heroVideoUrl)}
           />
         ) : hasBgImage ? (
           <>

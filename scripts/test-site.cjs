@@ -201,3 +201,55 @@ test('site identity: preview settings are part of the validated site settings', 
   assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareTitle: 'x'.repeat(121) }).success, false)
   assert.equal(sitePresentationSchema.safeParse({ ...plain(DEFAULT_PRESENTATION), shareImageUrl: 'https://res.cloudinary.com/demo/image/upload/v1/a.jpg', shareTitle: 'Us' }).success, true)
 })
+
+// ─── Scroll performance and browser bars ──────────────────────────────────────
+test('performance: the background video is requested in a lighter form, once', () => {
+  const media = load('src/lib/media.ts')
+  const original = 'https://res.cloudinary.com/demo/video/upload/v1774637039/DSCF1010_bt6bpl.mp4'
+  const light = media.backgroundVideoUrl(original)
+  assert.equal(light, 'https://res.cloudinary.com/demo/video/upload/q_auto:good,w_1280,c_limit,vc_h264,ac_none/v1774637039/DSCF1010_bt6bpl.mp4')
+  assert.equal(media.backgroundVideoUrl(light), light, 'an address that already has a transformation is left alone')
+  assert.equal(media.backgroundVideoUrl('https://res.cloudinary.com/demo/video/upload/clip.mp4'), 'https://res.cloudinary.com/demo/video/upload/q_auto:good,w_1280,c_limit,vc_h264,ac_none/clip.mp4')
+  for (const other of ['https://example.com/video.mp4', '/wedding/scene-5.mp4', '', 'https://res.cloudinary.com/demo/image/upload/v1/a.jpg']) assert.equal(media.backgroundVideoUrl(other), other)
+  const hero = read('src/components/sections/Hero.tsx')
+  assert.match(hero, /src=\{backgroundVideoUrl\(heroVideoUrl\)\}/)
+  assert.match(hero, /ref=\{modalVideoRef\}\s+src=\{heroVideoUrl\}/, 'the story player keeps the original video with sound')
+})
+
+test('performance: 3D scenes are prepared during the welcome, not during a scroll', () => {
+  const world = read('src/world/WeddingWorld.tsx')
+  assert.match(world, /function warmUp\(\)/)
+  assert.match(world, /renderer\.compile\(world\.scene,camera\)/)
+  assert.match(world, /couple=loaded;world\.scene\.add\(loaded\.root\);warmUp\(\)/)
+  assert.match(world, /dispatchEvent\(new Event\('wedding-world-ready'\)\)/)
+  assert.ok(!/new T\.Fog\([^)]*\)[^\n]*\n[^\n]*drawWorld/.test(world) && (world.match(/new T\.Fog\(/g) || []).length === 2, 'fog objects are created once, not per frame')
+  assert.ok(!/world\.scene\.background=kind==='peek'\?null:new T\.Color/.test(world), 'background colours are reused')
+  assert.match(read('src/components/WeddingSite.tsx'), /setWorldReady\(true\)/)
+  assert.ok(!/rootMargin: '500px'/.test(read('src/components/WeddingSite.tsx')), 'the engine no longer waits for a scene to approach')
+  const preload = read('src/lib/loading/preload.ts')
+  assert.match(preload, /loadEngine\(\)\.then\(worldPrepared/)
+  assert.match(preload, /WORLD_WAIT_MS = 8000/)
+})
+
+test('browser bars: the hero colour is read from the video and darkened like its overlay', () => {
+  const pixels = (r, g, b, n = 4) => Array.from({ length: n }, () => [r, g, b, 255]).flat()
+  assert.equal(status.heroColorFromPixels(pixels(100, 150, 200)), '#283C50')
+  assert.equal(status.heroColorFromPixels([...pixels(0, 0, 0, 2), ...pixels(200, 200, 200, 2)]), '#282828', 'averages the strip')
+  assert.equal(status.heroColorFromPixels([10, 20, 30, 0, 100, 100, 100, 255]), '#282828', 'ignores empty pixels')
+  assert.equal(status.heroColorFromPixels([]), null)
+  assert.equal(status.heroColorFromPixels([1, 2, 3, 0]), null)
+  const sync = read('src/components/loading/StatusBarColor.tsx')
+  assert.match(sync, /UPDATE_EVERY_MS = 120/, 'layout is not read on every scroll frame')
+  assert.match(sync, /videoBlocked = true/, 'a video that cannot be read falls back quietly')
+})
+
+test('browser bars: the page draws edge to edge and floating controls respect the safe areas', () => {
+  const layout = read('src/app/layout.tsx')
+  assert.match(layout, /viewportFit:\s+'cover'/)
+  assert.match(layout, /statusBarStyle: 'black-translucent'/)
+  const css = read('src/app/globals.css')
+  for (const rule of ['.site-navbar{top:calc(18px + env(safe-area-inset-top))}', 'body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}', 'body:not(:has(#home)){padding-top:env(safe-area-inset-top)}', 'env(safe-area-inset-bottom)']) {
+    assert.ok(css.includes(rule), rule)
+  }
+  assert.match(read('src/components/sections/Navbar.tsx'), /'site-navbar fixed top-\[18px\]/)
+})

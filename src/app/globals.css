@@ -306,3 +306,15 @@ html[data-site-motion=reduced] .site-preloader[data-phase=opening] .site-preload
 .footer-note a{color:inherit;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#ffffff66;min-height:24px}
 .footer-note a:hover,.footer-note a:focus-visible{opacity:1;text-decoration-color:#fff}
 .footer-note:hover,.footer-note:focus-within{opacity:.85}
+
+/* ─── Phone safe areas (the page draws edge to edge; see viewportFit in layout.tsx) ─── */
+/* Keep content clear of a notch in landscape. */
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+/* Pages without the full-screen hero start below the status bar when saved to a home screen. */
+body:not(:has(#home)){padding-top:env(safe-area-inset-top)}
+/* The floating navigation and the back-to-top button stay clear of the status bar and home indicator. */
+.site-navbar{top:calc(18px + env(safe-area-inset-top))}
+.back-top-wrap{bottom:max(20px,calc(env(safe-area-inset-bottom) + 10px))}
+@media(max-width:767px){.back-top-wrap{bottom:max(14px,calc(env(safe-area-inset-bottom) + 8px))}}
+.site-preloader-content{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.wedding-footer{padding-bottom:env(safe-area-inset-bottom)}
