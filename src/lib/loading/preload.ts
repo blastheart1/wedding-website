@@ -35,6 +35,28 @@ function videoReady(): Promise<void> {
   })
 }
 
+/** How long to wait for the 3D scenes to finish preparing before letting the guest in anyway. */
+const WORLD_WAIT_MS = 8000
+
+/**
+ * Resolves when the 3D engine has compiled and drawn each scene once, when it
+ * reports that 3D is unavailable on this device, or after a time limit.
+ */
+function worldPrepared(): Promise<void> {
+  if (document.documentElement.dataset.worldReady === 'true' || document.querySelector('[data-wedding-scene]') === null) return Promise.resolve()
+  return new Promise(resolve => {
+    const done = () => {
+      window.removeEventListener('wedding-world-ready', done)
+      window.removeEventListener('wedding-world-unavailable', done)
+      window.clearTimeout(timer)
+      resolve()
+    }
+    const timer = window.setTimeout(done, WORLD_WAIT_MS)
+    window.addEventListener('wedding-world-ready', done)
+    window.addEventListener('wedding-world-unavailable', done)
+  })
+}
+
 const assetStep = (asset: SiteAsset): Step => ({
   weight: asset.weight,
   run: () => (asset.kind === 'image' ? loadImage(asset.url) : loadData(asset.url)),
@@ -49,7 +71,7 @@ export function preloadSite(loadEngine: () => Promise<unknown>, onProgress: (don
   const steps: Step[] = [
     ...SITE_ASSETS.map(assetStep),
     { weight: EXTRA_STEPS.fonts, run: loadFonts },
-    { weight: EXTRA_STEPS.engine, run: () => loadEngine().catch(() => undefined) },
+    { weight: EXTRA_STEPS.engine, run: () => loadEngine().then(worldPrepared, () => undefined) },
     { weight: EXTRA_STEPS.video, run: videoReady },
   ]
   let done = 0

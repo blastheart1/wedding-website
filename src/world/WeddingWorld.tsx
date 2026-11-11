@@ -20,6 +20,9 @@ export default function WorldEngine(){
   try{renderer=new T.WebGLRenderer({antialias:true,alpha:true,powerPreference:'low-power'})}
   catch{document.documentElement.classList.add('world-unavailable');window.dispatchEvent(new Event('wedding-world-unavailable'));return}
   renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.AgXToneMapping;renderer.toneMappingExposure=1.05
+  // Reading back each shader's compile log makes the browser wait for the compile to finish.
+  // That check is for development; in production it only costs time.
+  renderer.debug.checkShaderErrors=process.env.NODE_ENV!=='production'
   renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;renderer.info.autoReset=false
   renderer.domElement.setAttribute('aria-hidden','true');renderer.domElement.className='world-canvas';renderer.domElement.tabIndex=-1
   const world=makeEnvironmentWorld(),bench=makeBench();world.night.add(bench)
@@ -44,7 +47,49 @@ export default function WorldEngine(){
    frame.width=Math.round(lastWidth);frame.height=Math.round(lastHeight)
    frame.getContext('2d')?.drawImage(renderer.domElement,0,0,frame.width,frame.height)
   }
-  const releaseMoon=applyLunarMaterial(world.moon,()=>{dirty=true;start()})
+  // One set of colours and fog, reused every frame instead of being rebuilt 60 times a second.
+  const backgrounds={night:new T.Color('#101b2c'),church:new T.Color('#f5e9df'),walk:new T.Color('#f7eee4')}
+  const nightFog=new T.Fog('#101b2c',52.6,92.6),dayFog=new T.Fog('#f5e9df',25,65)
+  /** Shows the right part of the world and its lighting for one kind of scene. */
+  function applyKind(kind:SceneName){
+   world.church.visible=kind==='church';world.night.visible=kind==='night';world.walk.visible=kind==='walk'
+   const color=kind==='night'?'#101b2c':kind==='church'?'#f5e9df':'#f7eee4'
+   world.scene.background=kind==='peek'?null:kind==='night'?backgrounds.night:kind==='church'?backgrounds.church:backgrounds.walk;renderer.setClearColor(color,kind==='peek'?0:1)
+   // The night orthographic camera retreats along its original sight line so
+   // its near plane never cuts the foreground. Shift fog by the same distance.
+   world.scene.fog=kind==='peek'?null:kind==='night'?nightFog:dayFog
+   world.scene.environmentIntensity=kind==='night'?.18:.55;world.hemisphere.intensity=kind==='night'?.85:1.55;world.key.intensity=kind==='night'?1.2:2.1;world.key.color.set(kind==='night'?'#c6d5ff':'#ffe8cb');world.fill.intensity=kind==='night'?.65:1
+  }
+  /**
+   * Prepares every scene on the page before the guest scrolls to it: compiles
+   * the shaders, uploads the textures and draws one small hidden frame of each.
+   * Without this the first sight of a scene stalls the scroll for a moment.
+   */
+  function warmUp(){
+   if(failed||disposed)return
+   try{
+    renderer.setPixelRatio(1);renderer.setSize(96,96,false)
+    for(const kind of new Set(slots.map(el=>el.dataset.weddingScene as SceneName))){
+     applyKind(kind)
+     const view=shot(kind,1,.5,reducedRef.current)
+     camera.left=-view.height/2;camera.right=view.height/2;camera.top=view.height/2;camera.bottom=-view.height/2
+     camera.position.set(view.position[0],view.position[1],view.position[2]);camera.lookAt(view.target[0],view.target[1],view.target[2]);camera.updateProjectionMatrix()
+     // Pose the scene the way a real frame would, so the same shader variants get built.
+     if(kind==='night')world.nightScene.update(1,view.height,0,true,reducedRef.current)
+     couple?.update(kind,.5,0,0,reducedRef.current,0,1,1,'stargaze')
+     renderer.compile(world.scene,camera)
+     world.scene.traverseVisible(object=>{
+      const material=(object as T.Mesh).material
+      for(const item of Array.isArray(material)?material:material?[material]:[])for(const value of Object.values(item))if(value instanceof T.Texture&&value.image)renderer.initTexture(value)
+     })
+     drawWorld()
+    }
+   }catch(error){console.warn('Wedding scenes could not be prepared ahead of time',error)}
+   // The next real frame sets its own size again.
+   lastWidth=0;lastHeight=0;dirty=true
+   document.documentElement.dataset.worldReady='true';window.dispatchEvent(new Event('wedding-world-ready'))
+  }
+  const releaseMoon=applyLunarMaterial(world.moon,()=>{if(couple)warmUp();dirty=true;start()})
   let couple:RiggedCouple|null=null,disposed=false,active:HTMLElement|null=null,lastRender=0
   let previousY=window.scrollY,previousScroll=performance.now(),speed=0,pointer=0,direction=1,dirty=true,running=false,failed=false,lastWidth=0,lastHeight=0
   function measure(){
@@ -71,13 +116,7 @@ export default function WorldEngine(){
    const view=shot(kind,aspect,progress,reducedRef.current)
    camera.left=-view.height*aspect/2;camera.right=view.height*aspect/2;camera.top=view.height/2;camera.bottom=-view.height/2
    camera.position.set(view.position[0],view.position[1],view.position[2]);camera.lookAt(view.target[0],view.target[1],view.target[2]);camera.updateProjectionMatrix()
-   world.church.visible=kind==='church';world.night.visible=kind==='night';world.walk.visible=kind==='walk'
-   const color=kind==='night'?'#101b2c':kind==='church'?'#f5e9df':'#f7eee4'
-   world.scene.background=kind==='peek'?null:new T.Color(color);renderer.setClearColor(color,kind==='peek'?0:1)
-   // The night orthographic camera retreats along its original sight line so
-   // its near plane never cuts the foreground. Shift fog by the same distance.
-   world.scene.fog=kind==='peek'?null:new T.Fog(kind==='night'?'#101b2c':'#f5e9df',kind==='night'?52.6:25,kind==='night'?92.6:65)
-   world.scene.environmentIntensity=kind==='night'?.18:.55;world.hemisphere.intensity=kind==='night'?.85:1.55;world.key.intensity=kind==='night'?1.2:2.1;world.key.color.set(kind==='night'?'#c6d5ff':'#ffe8cb');world.fill.intensity=kind==='night'?.65:1
+   applyKind(kind)
    if(pausedRef.current)speed=0;else if(now-previousScroll>80)speed*=Math.exp(-dt*4)
    if(kind==='night'){world.nightScene.update(aspect,view.height,dt,still,reducedRef.current);bench.visible=nightMode==='stargaze';const n=nightLayout(aspect);bench.position.set(n.bench.x,0,n.bench.z);bench.rotation.y=n.bench.rotation;bench.scale.setScalar(n.bench.scale);world.moon.position.set(n.moon.x,n.moon.y,n.moon.z);world.moon.scale.setScalar(n.moon.scale);world.moon.rotation.y=.4}
    // Pause preserves the current clip frame; reduced motion uses a deliberate static pose.
@@ -91,7 +130,7 @@ export default function WorldEngine(){
   function stop(){renderer.setAnimationLoop(null);running=false}
   loadRiggedCouple().then(loaded=>{
    if(disposed){loaded.dispose();const temporary=new T.Scene();temporary.add(loaded.root);disposeWorld(temporary);return}
-   couple=loaded;world.scene.add(loaded.root);dirty=true;start()
+   couple=loaded;world.scene.add(loaded.root);warmUp();dirty=true;start()
   }).catch(error=>{document.documentElement.classList.add('characters-unavailable');window.dispatchEvent(new Event('wedding-world-unavailable'));console.warn('Wedding characters could not load',error)})
   const lost=(e:Event)=>{e.preventDefault();failed=true;stop();active?.removeAttribute('data-world-active');renderer.domElement.remove();document.documentElement.classList.add('world-unavailable');window.dispatchEvent(new Event('wedding-world-unavailable'))}
   const visibility=()=>{if(document.hidden)stop();else{dirty=true;start()}}

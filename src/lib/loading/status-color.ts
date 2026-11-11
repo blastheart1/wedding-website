@@ -19,6 +19,24 @@ export const STATUS_RULES: readonly { selector: string; color: string }[] = [
 
 export const STATUS_EVENT = 'site:status-color'
 
+/** How much of the video shows through the hero's dark overlay at its top edge (black at 60%). */
+export const HERO_OVERLAY_SHARE = 0.4
+
+/**
+ * The colour of the hero at its top edge: the average of the video's top rows,
+ * darkened the way the overlay darkens it. `pixels` is RGBA data.
+ */
+export function heroColorFromPixels(pixels: ArrayLike<number>): string | null {
+  let red = 0, green = 0, blue = 0, count = 0
+  for (let index = 0; index + 3 < pixels.length; index += 4) {
+    if (pixels[index + 3] === 0) continue
+    red += pixels[index]; green += pixels[index + 1]; blue += pixels[index + 2]; count += 1
+  }
+  if (count === 0) return null
+  const channel = (total: number) => Math.round((total / count) * HERO_OVERLAY_SHARE).toString(16).padStart(2, '0')
+  return `#${channel(red)}${channel(green)}${channel(blue)}`.toUpperCase()
+}
+
 /** True for a fully opaque CSS colour such as "rgb(46, 31, 26)" or "rgba(46, 31, 26, 1)". */
 export function isOpaqueColor(value: string): boolean {
   const match = /^rgba?\(([^)]+)\)$/.exec(value.trim())

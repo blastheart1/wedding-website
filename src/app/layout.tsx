@@ -5,6 +5,9 @@ import { Toaster } from 'sonner'
 export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
+  // Let the page draw under the phone's status bar, notch and home indicator, so the
+  // browser's bars sit over the site's own content instead of a separate band of colour.
+  viewportFit:  'cover',
   // Cream, matching the page. The home page keeps this in step with the section on screen
   // (see StatusBarColor), so the phone status bar never shows a mismatched band.
   themeColor:   '#FDFAF6',
@@ -32,7 +35,7 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: '/app-icon/180', sizes: '180x180', type: 'image/png' }],
   },
-  appleWebApp: { capable: true, title: 'Luis & Bee', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: 'Luis & Bee', statusBarStyle: 'black-translucent' },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
