@@ -19,10 +19,18 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/app-icon/:size',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400' }],
+      },
+      {
         source: '/wedding/:path*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=2592000' }],
       },
     ]
+  },
+  // Browsers and some apps ask for /favicon.ico without being told to. Send them to the site icon.
+  async redirects() {
+    return [{ source: '/favicon.ico', destination: '/app-icon/32', permanent: false }]
   },
 }
 

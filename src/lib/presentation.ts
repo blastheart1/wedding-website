@@ -27,6 +27,10 @@ export const sitePresentationSchema = z.object({
   footerContactUrl: httpsUrl,
   // The quiz and bouquet games are hidden unless the couple turns them on.
   showGames: z.boolean(),
+  // Link preview shown when the site address is shared. Empty values use the automatic card.
+  shareTitle: z.string().max(120),
+  shareDescription: z.string().max(240),
+  shareImageUrl: httpsUrl,
   ceremonyImages: z.array(z.object({ src: imageUrl, alt: z.string().max(500), label: z.string().max(100) }).strict()).max(12),
 }).strict()
 export type SitePresentation = z.infer<typeof sitePresentationSchema>
@@ -43,6 +47,9 @@ export const DEFAULT_PRESENTATION: SitePresentation = {
   footerContactEmail: 'antonioluis.santos1@gmail.com',
   footerContactUrl: 'https://codebyluis.dev',
   showGames: false,
+  shareTitle: '',
+  shareDescription: '',
+  shareImageUrl: '',
   ceremonyImages: [
     { src: '/wedding/church-1.jpg', alt: 'Front view of Old Bosoboso Church, framed by trees', label: 'The church' },
     { src: '/wedding/church-2.jpg', alt: 'Stone façade and entrance of Old Bosoboso Church', label: 'The façade' },
