@@ -17,7 +17,8 @@ const report = {
   missingRequiredEnvironment: required.filter(key => !env[key]),
   missingUploadEnvironment: uploads.filter(key => !env[key]),
   jwtSecretStrongLength: Buffer.byteLength(env.JWT_SECRET || '') >= 32,
-  adminPasswordHashValidFormat: /^\$2[aby]\$\d\d\$/.test(env.ADMIN_PASSWORD_HASH || ''),
+  // In .env files Next.js expands a dollar sign, so a bcrypt hash is written there with each one escaped by a backslash. Accept that form.
+  adminPasswordHashValidFormat: /^\$2[aby]\$\d\d\$/.test((env.ADMIN_PASSWORD_HASH || '').split(String.fromCharCode(92, 36)).join(String.fromCharCode(36))),
   cloudinaryNamesMatch: !!env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_CLOUD_NAME === env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   database: null,
 }

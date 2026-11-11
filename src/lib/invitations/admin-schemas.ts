@@ -3,7 +3,7 @@ import { normalizeEmail, normalizePhone } from './phone'
 import { MAX_SEATS } from './policy'
 
 export const MAX_BULK = 500
-export const SHARE_CHANNELS = ['messenger', 'instagram', 'email', 'other'] as const
+export const SHARE_CHANNELS = ['messenger', 'instagram', 'sms', 'email', 'other'] as const
 export type ShareChannel = (typeof SHARE_CHANNELS)[number]
 
 const blankToUndefined = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? undefined : value)

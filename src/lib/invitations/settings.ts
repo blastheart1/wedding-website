@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FIELD_TOKENS, templateProblem, type TemplateField } from './tokens'
 
 const line = (max: number) => z.string().trim().min(1).max(max)
 
@@ -14,6 +15,12 @@ export const inviteSettingsSchema = z.object({
   dos: z.array(line(240)).max(20),
   donts: z.array(line(240)).max(20),
   acknowledgement: line(400),
+}).superRefine((settings, context) => {
+  // A mistyped placeholder would reach guests as literal text, so it is refused here as well as in the editor.
+  for (const field of Object.keys(FIELD_TOKENS) as TemplateField[]) {
+    const problem = templateProblem(field, settings[field])
+    if (problem) context.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: problem })
+  }
 })
 
 export type InviteSettings = z.infer<typeof inviteSettingsSchema>

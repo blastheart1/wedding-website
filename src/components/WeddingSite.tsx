@@ -16,7 +16,6 @@ import { FAQSection } from '@/components/sections/FAQSection'
 import { GamesSection } from '@/components/sections/GamesSection'
 import { RSVPDialog } from '@/components/sections/RSVPDialog'
 import { WeddingJourney } from '@/world/Journey'
-import { SiteOptionsShortcut } from '@/components/ui/SiteOptions'
 import { arrowUp } from '@/extra-assets'
 
 const WorldEngine = dynamic(() => import('@/world/WeddingWorld'), { ssr: false })
@@ -52,7 +51,6 @@ function Content({ config }: { config: PublicConfig }) {
   }, [])
   return <MotionConfig reducedMotion={reduced ? 'always' : 'user'} transition={reduced ? { duration: 0 } : undefined}>
     <a className="skip-link" href="#details">Skip to wedding details</a>
-    <SiteOptionsShortcut />
     <main>
       <Navbar config={config} />
       <div className="section-shell"><Hero config={config} /></div>
@@ -62,7 +60,7 @@ function Content({ config }: { config: PublicConfig }) {
       <Gallery bgUrl={config.galleryBgUrl} heading={config.sectionHeadings.gallery} />
       <WeddingJourney config={config} />
       <FAQSection bgUrl={config.faqBgUrl} heading={config.sectionHeadings.faq} />
-      <GamesSection />
+      {config.presentation.showGames && <GamesSection />}
       <Footer config={config} />
     </main>
     <div className="back-top-wrap"><AnimatePresence>{backTop && <motion.button className="back-top" initial={reduced ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? {} : { opacity: 0, y: 12 }} onClick={() => document.getElementById('home')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })} aria-label="Back to top"><img src={arrowUp} alt="" />Top</motion.button>}</AnimatePresence></div>

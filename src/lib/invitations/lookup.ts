@@ -21,6 +21,8 @@ export interface LookupDeps {
   emailLink(invitationId: number): Promise<boolean>
   /** Flags the invitation so the couple can message the guest their link. */
   requestLink(invitationId: number, now: Date): Promise<void>
+  /** Records a guest's note asking for a change, for the couple to act on. */
+  requestChange(invitationId: number, note: string, now: Date): Promise<void>
 }
 
 export interface LookupResult {
@@ -62,4 +64,26 @@ export async function lookupStatus(deps: LookupDeps, input: unknown, ip: string,
   const emailed = match.hasEmail ? await deps.emailLink(match.id) : false
   if (!emailed) await deps.requestLink(match.id, now)
   return { status: 200, body: { success: true, data: { found: true, responded: match.responded, delivery: emailed ? 'email' : 'manual' } } }
+}
+
+export const CHANGE_NOTE_MAX = 500
+export const CHANGE_NOTE_REQUIRED = 'Please tell us what you would like to change.'
+
+/**
+ * A guest asks the couple to change their RSVP. Typing a contact does not
+ * prove who someone is, so this never edits the RSVP: it leaves a note for
+ * the couple. The answer is the same whether or not the contact is on the
+ * list, so it cannot be used to test who is invited.
+ */
+export async function requestRsvpChange(deps: LookupDeps, input: unknown, note: unknown, ip: string, now: Date = new Date()): Promise<ServiceResult<{ received: true }>> {
+  const contact = typeof input === 'string' && input.length <= 255 ? normalizeContact(input) : null
+  if (await deps.hit(rateKey('ip', ip), now) > LOOKUP_LIMIT) return { status: 429, body: { success: false, error: LOOKUP_LIMITED } }
+  if (!contact) return { status: 400, body: { success: false, error: LOOKUP_INVALID } }
+  const text = typeof note === 'string' ? note.trim().slice(0, CHANGE_NOTE_MAX) : ''
+  if (!text) return { status: 400, body: { success: false, error: CHANGE_NOTE_REQUIRED } }
+  if (await deps.hit(rateKey('value', 'change:' + contact.value), now) > LOOKUP_LIMIT) return { status: 429, body: { success: false, error: LOOKUP_LIMITED } }
+
+  const match = await deps.findByContact(contact)
+  if (match && match.status === 'active' && match.responded) await deps.requestChange(match.id, text, now)
+  return { status: 200, body: { success: true, data: { received: true } } }
 }

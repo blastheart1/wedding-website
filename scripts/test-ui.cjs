@@ -65,7 +65,9 @@ test('Production data comes from APIs and CMS, never embedded sample guests', ()
   const rsvp=fs.readFileSync(path.join(root,'src/components/sections/RSVPDialog.tsx'),'utf8')
   assert.ok(story.includes("'/api/story'")); assert.ok(gallery.includes("'/api/gallery'"))
   for (const text of [story,gallery,rsvp]) assert.ok(!/preview-data|lookupSample|alex@example.com|rsvp-preview/.test(text))
-  assert.ok(rsvp.includes("'/api/rsvp/verify'"));assert.ok(rsvp.includes("'/api/rsvp'"));assert.ok(rsvp.includes('pending.current'))
+  // RSVPs go through personal links; the dialog only checks a guest's status.
+  const statusCheck=fs.readFileSync(path.join(root,'src/components/rsvp/useStatusCheck.ts'),'utf8')
+  assert.ok(statusCheck.includes("'/api/invite/lookup'"));assert.ok(!/['"]\/api\/rsvp/.test(rsvp+statusCheck));assert.ok(statusCheck.includes('pending.current'))
 })
 test('CMS presentation validates URLs and preserves explicit cleared images', () => {
   const {DEFAULT_PRESENTATION,sitePresentationSchema,parseSitePresentation}=load('src/lib/presentation.ts')

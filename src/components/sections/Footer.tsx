@@ -4,7 +4,6 @@ import { useRef } from 'react'
 import { motion, useInView } from 'framer-motion'
 import type { PublicConfig } from '@/lib/config'
 import { stagger, fadeUp, fadeIn } from '@/lib/animations'
-import {SiteOptions} from '@/components/ui/SiteOptions'
 import {useWorldMotion} from '@/lib/site-motion'
 
 interface FooterProps {
@@ -59,12 +58,12 @@ export function Footer({ config }: FooterProps) {
         )}
 
       </motion.div>
-      {(config.presentation.footerContactEmail || config.presentation.footerContactUrl) && <div className="footer-contact">
-        <h2 className="font-display">Want something like this?</h2>
-        <a href={`mailto:${config.presentation.footerContactEmail}`}>{config.presentation.footerContactEmail}</a>
-        <a href={config.presentation.footerContactUrl} target="_blank" rel="noopener noreferrer">{config.presentation.footerContactUrl.replace(/^https:\/\//, '')}</a>
-      </div>}
-      <SiteOptions/>
+      {/* One quiet line for the maker's contact, never competing with the names above. */}
+      {(config.presentation.footerContactEmail || config.presentation.footerContactUrl) && <p className="footer-note">
+        <span>Want something like this?</span>
+        {config.presentation.footerContactUrl && <a href={config.presentation.footerContactUrl} target="_blank" rel="noopener noreferrer">{config.presentation.footerContactUrl.replace(/^https:\/\//, '')}</a>}
+        {config.presentation.footerContactEmail && <a href={`mailto:${config.presentation.footerContactEmail}`}>Email</a>}
+      </p>}
     </footer>
   )
 }

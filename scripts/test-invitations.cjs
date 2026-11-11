@@ -451,7 +451,7 @@ test('admin: update actions accept only known shapes', () => {
   const { updateInputSchema } = adminSchemas
   assert.equal(updateInputSchema.parse({ action: 'shared', id: 4, channel: 'messenger' }).channel, 'messenger')
   assert.equal(updateInputSchema.parse({ action: 'edit', id: 4, guestName: 'Jo Cruz', email: '', phone: '09171234567', seats: 2 }).phone, '+639171234567')
-  for (const bad of [{ action: 'shared', id: 4, channel: 'sms' }, { action: 'delete', id: 4 }, { action: 'revoke', id: -1 }, { action: 'revoke', id: '4' }, { action: 'edit', id: 4 }, { id: 4 }]) {
+  for (const bad of [{ action: 'shared', id: 4, channel: 'fax' }, { action: 'delete', id: 4 }, { action: 'revoke', id: -1 }, { action: 'revoke', id: '4' }, { action: 'edit', id: 4 }, { id: 4 }]) {
     assert.equal(updateInputSchema.safeParse(bad).success, false, JSON.stringify(bad))
   }
 })
@@ -482,12 +482,13 @@ test('admin: pasted lists become guests, with plus counts and per-line errors', 
 const lookup = load('src/lib/invitations/lookup.ts')
 
 function lookupHarness(rows = {}) {
-  const state = { counts: new Map(), keys: [], finds: 0, emails: [], requests: [], emailWorks: true }
+  const state = { counts: new Map(), keys: [], finds: 0, emails: [], requests: [], changes: [], emailWorks: true }
   const deps = {
     async hit(key) { state.keys.push(key); const next = (state.counts.get(key) ?? 0) + 1; state.counts.set(key, next); return next },
     async findByContact(contact) { state.finds++; return rows[contact.value] ?? null },
     async emailLink(id) { state.emails.push(id); return state.emailWorks },
     async requestLink(id) { state.requests.push(id) },
+    async requestChange(id, note) { state.changes.push({ id, note }) },
   }
   return { state, deps }
 }
@@ -632,7 +633,7 @@ test('admin routes: every handler answers 401 and touches no data without a sess
 
 // ─── Dashboard status helpers ─────────────────────────────────────────────────
 test('dashboard: stages, filters and totals follow the invitation data', () => {
-  const status = load('src/app/admin/invitations/_components/status.ts')
+  const status = load('src/app/admin/(panel)/invitations/_components/status.ts')
   const row = extra => ({ id: 1, guestName: 'Maria Santos', email: 'maria@example.com', phone: '+639171234567', seats: 3, status: 'active', sentAt: null, lastChannel: null,
     firstOpenedAt: null, lastOpenedAt: null, openCount: 0, respondedAt: null, linkRequestedAt: null, createdAt: '2026-11-11T00:00:00.000Z', response: null, ...extra })
   const response = (attending, partySize) => ({ attending, partySize, companions: [], dietary: null, songRequest: null, message: null, updatedAt: null })
@@ -654,7 +655,7 @@ test('dashboard: stages, filters and totals follow the invitation data', () => {
 
 // ─── Interface rules: no emoji, no coloured borders, no hand-drawn icons ──────
 test('interface: new screens use no emoji, no coloured borders and no hand-drawn icons', () => {
-  const folders = ['src/app/admin/invitations', 'src/app/i', 'src/app/rsvp/find']
+  const folders = ['src/app/admin', 'src/app/i', 'src/app/rsvp/find']
   const files = []
   const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else if (/\.tsx?$/.test(entry.name)) files.push(full) } }
   folders.forEach(folder => walk(path.join(root, folder)))
@@ -677,7 +678,7 @@ test('database: queries are never served from the Next.js fetch cache', () => {
   const client = fs.readFileSync(path.join(root, 'src/lib/db.ts'), 'utf8')
   assert.match(client, /neon\(url,\s*\{\s*fetchOptions:\s*\{\s*cache:\s*'no-store'\s*\}\s*\}\)/, 'database queries must bypass the Next.js fetch cache')
   assert.match(fs.readFileSync(path.join(root, 'src/lib/invitations/db.ts'), 'utf8'), /export \{ getDb as getInviteDb, schema \} from '@\/lib\/db'/)
-  const folders = ['src/lib/invitations', 'src/app/i', 'src/app/rsvp', 'src/app/api/invite', 'src/app/api/admin/invitations', 'src/app/api/webhooks', 'src/app/admin/invitations']
+  const folders = ['src/lib/invitations', 'src/app/i', 'src/app/rsvp', 'src/app/api/invite', 'src/app/api/admin/invitations', 'src/app/api/webhooks', 'src/app/admin/(panel)/invitations']
   const files = []
   const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else if (/\.tsx?$/.test(entry.name)) files.push(full) } }
   folders.forEach(folder => walk(path.join(root, folder)))
@@ -784,7 +785,7 @@ test('mailer: simulation never contacts the provider, never overrides real setti
   assert.equal(mailerWith({ INVITE_EMAIL_SIMULATE: '1', VERCEL_ENV: 'production' }).mailer.emailMode(), 'off')
   assert.equal(mailerWith({ INVITE_EMAIL_SIMULATE: 'true' }).mailer.emailMode(), 'off')
   assert.equal(mailerWith({}).mailer.emailMode(), 'off')
-  const status = load('src/app/admin/invitations/_components/status.ts')
+  const status = load('src/app/admin/(panel)/invitations/_components/status.ts')
   assert.equal(status.eventLabel('email_sent', 'email', '{"emailId":"simulated-1","simulated":true}'), 'Email simulated (nothing sent)')
   assert.equal(status.eventLabel('email_sent', 'email', '{"emailId":"abc"}'), 'Email sent')
 })
@@ -795,4 +796,142 @@ test('send: a preview may load the QR image from the address it is opened on, bu
   assert.ok(preview.html.includes('src="http://127.0.0.1:3190/i/Ab3dE_fGh1jKlMn0pQrStU/qr"'))
   assert.ok(preview.html.includes('href="https://example.test/i/Ab3dE_fGh1jKlMn0pQrStU"'))
   assert.ok(!preview.html.includes('href="http://127.0.0.1'))
+})
+
+// ─── Placeholders (pills) ─────────────────────────────────────────────────────
+const tokens = load('src/lib/invitations/tokens.ts')
+
+test('placeholders: wording splits into text and pills and joins back unchanged', () => {
+  const allowed = tokens.FIELD_TOKENS.shareMessage
+  const text = 'Hi {firstName}! See you on {date}.\nYour link: {link}'
+  const segments = tokens.toSegments(text, allowed)
+  assert.deepEqual(plain(segments), [
+    { type: 'text', value: 'Hi ' }, { type: 'token', key: 'firstName' }, { type: 'text', value: '! See you on ' },
+    { type: 'token', key: 'date' }, { type: 'text', value: '.\nYour link: ' }, { type: 'token', key: 'link' },
+  ])
+  assert.equal(tokens.fromSegments(segments), text)
+  for (const edge of ['', 'no placeholders', '{firstName}', '{firstName}{date}', '{date} at the start', 'at the end {date}', 'braces {} and { spaced }']) {
+    assert.equal(tokens.fromSegments(tokens.toSegments(edge, allowed)), edge, edge)
+  }
+  assert.deepEqual(plain(tokens.toSegments('{firstName}{date}', allowed)), [{ type: 'token', key: 'firstName' }, { type: 'token', key: 'date' }])
+})
+
+test('placeholders: a mistyped one is caught with a suggestion; an allowed one is not', () => {
+  const allowed = tokens.FIELD_TOKENS.previewTitle
+  assert.deepEqual(plain(tokens.unknownTokens("{firstName}, you're invited on {date}", allowed)), [])
+  const cases = { '{firstNam}': 'firstName', '{first name}': 'firstName', '{FirstName}': 'firstName', '{fristName}': 'firstName', '{partner 1}': 'partner1', '{Date}': 'date', '{partner}': 'partner1' }
+  for (const [raw, expected] of Object.entries(cases)) {
+    assert.deepEqual(plain(tokens.unknownTokens(`Hello ${raw}!`, allowed)), [{ raw, suggestion: expected }], raw)
+  }
+  assert.deepEqual(plain(tokens.unknownTokens('{banana} {banana} {}', allowed)), [{ raw: '{banana}', suggestion: null }, { raw: '{}', suggestion: null }])
+  assert.deepEqual(plain(tokens.unknownTokens('{link}', allowed)), [{ raw: '{link}', suggestion: null }], 'the link is not allowed in the link preview')
+  assert.deepEqual(plain(tokens.unknownTokens('{link}', tokens.FIELD_TOKENS.shareMessage)), [])
+})
+
+test('placeholders: each field reports what is wrong in plain words', () => {
+  assert.equal(tokens.templateProblem('previewTitle', "{firstName}, you're invited"), null)
+  assert.equal(tokens.templateProblem('previewTitle', '{firstNam}, hello'), '{firstNam} is not a placeholder. Did you mean First name?')
+  assert.match(tokens.templateProblem('emailSubject', 'Hi {whoever}'), /Use the buttons/)
+  assert.match(tokens.templateProblem('shareMessage', 'Hi {firstName}, see you there'), /needs the Link/)
+  assert.equal(tokens.templateProblem('shareMessage', 'Hi {firstName}: {link}'), null)
+  assert.equal(tokens.tokenLabel('partner2'), 'Partner 2')
+})
+
+test('settings: the server refuses a mistyped placeholder and a share message without the link', () => {
+  const { inviteSettingsSchema, DEFAULT_INVITE_SETTINGS, parseInviteSettings } = load('src/lib/invitations/settings.ts')
+  const base = plain(DEFAULT_INVITE_SETTINGS)
+  assert.equal(inviteSettingsSchema.safeParse(base).success, true)
+  const typo = inviteSettingsSchema.safeParse({ ...base, previewTitle: '{firstNam}, you are invited' })
+  assert.equal(typo.success, false)
+  assert.match(typo.error.errors[0].message, /Did you mean First name/)
+  assert.deepEqual(plain(typo.error.errors[0].path), ['previewTitle'])
+  assert.equal(inviteSettingsSchema.safeParse({ ...base, shareMessage: 'Hi {firstName}, no link here' }).success, false)
+  assert.equal(inviteSettingsSchema.safeParse({ ...base, emailIntro: 'Your link is {link}' }).success, false, 'the email adds the link itself')
+  assert.equal(inviteSettingsSchema.safeParse({ ...base, emailSubject: 'See you on {date}, {firstName}' }).success, true)
+  assert.deepEqual(plain(parseInviteSettings(JSON.stringify({ previewTitle: '{oops}' }))), base, 'bad saved wording falls back to the defaults')
+})
+
+// ─── Public status check ──────────────────────────────────────────────────────
+test('status wording: each case says the right thing and never names the guest', () => {
+  const { statusCopy } = load('src/lib/invitations/status-copy.ts')
+  const deadline = 'January 27, 2027'
+  const notFound = statusCopy({ found: false, responded: false, delivery: null }, deadline)
+  assert.equal(notFound.title, 'We could not find that')
+  assert.equal(notFound.canRequestChange, false)
+
+  const waiting = statusCopy({ found: true, responded: false, delivery: 'manual' }, deadline)
+  assert.equal(waiting.title, 'You are on our list')
+  assert.match(waiting.body, /not received your RSVP yet/)
+  assert.match(waiting.body, /email, Messenger, Instagram or text/)
+  assert.equal(waiting.canRequestChange, false, 'only guests who replied can ask for a change')
+  assert.match(statusCopy({ found: true, responded: false, delivery: 'email' }, deadline).body, /just emailed/)
+
+  const replied = statusCopy({ found: true, responded: true, delivery: 'recent' }, deadline)
+  assert.equal(replied.title, 'We have your RSVP')
+  assert.match(replied.body, /until January 27, 2027/)
+  assert.equal(replied.canRequestChange, true)
+  assert.ok(!/until/.test(statusCopy({ found: true, responded: true, delivery: 'manual' }, '').body))
+  for (const copy of [notFound, waiting, replied]) assert.ok(!/Maria|seat|\/i\//i.test(copy.title + copy.body))
+})
+
+test('change request: a note reaches the couple only for a guest who replied, and never edits the RSVP', async () => {
+  const { state, deps } = lookupHarness(guests)
+  const ok = await lookup.requestRsvpChange(deps, 'maria@example.com', '  Please make it 3 seats.  ', '1.1.1.1', NOW)
+  assert.deepEqual(plain(ok), { status: 200, body: { success: true, data: { received: true } } })
+  assert.deepEqual(state.changes, [{ id: 1, note: 'Please make it 3 seats.' }])
+  assert.deepEqual([state.emails, state.requests], [[], []])
+  const long = await lookup.requestRsvpChange(deps, 'maria@example.com', 'x'.repeat(900), '1.1.1.2', NOW)
+  assert.equal(long.status, 200)
+  assert.equal(state.changes[1].note.length, 500)
+})
+
+test('change request: strangers, revoked guests and guests who have not replied get the same answer and leave no note', async () => {
+  const { state, deps } = lookupHarness(guests)
+  const answers = []
+  for (const [contact, ip] of [['stranger@example.com', '2.2.2.1'], ['gone@example.com', '2.2.2.2'], ['0917 123 4567', '2.2.2.3'], ['maria@example.com', '2.2.2.4']]) {
+    answers.push(await lookup.requestRsvpChange(deps, contact, 'Change please', ip, NOW))
+  }
+  for (const answer of answers) assert.deepEqual(plain(answer), plain(answers[0]))
+  assert.deepEqual(state.changes.map(change => change.id), [1], 'only the guest who replied leaves a note')
+})
+
+test('change request: bad input and repeated attempts are refused', async () => {
+  const { state, deps } = lookupHarness(guests)
+  assert.equal((await lookup.requestRsvpChange(deps, 'maria', 'note', '3.3.3.1', NOW)).status, 400)
+  for (const note of ['', '   ', null, undefined, 42, { text: 'x' }]) {
+    assert.equal((await lookup.requestRsvpChange(deps, 'maria@example.com', note, `3.3.4.${state.keys.length}`, NOW)).status, 400, String(note))
+  }
+  assert.equal(state.finds, 0, 'nothing is searched for invalid requests')
+  const limited = lookupHarness(guests)
+  for (let attempt = 1; attempt <= 5; attempt++) await lookup.requestRsvpChange(limited.deps, 'maria@example.com', 'note', `4.4.4.${attempt}`, NOW)
+  assert.equal((await lookup.requestRsvpChange(limited.deps, 'maria@example.com', 'note', '4.4.4.99', NOW)).status, 429)
+  assert.equal(limited.state.changes.length, 5)
+})
+
+test('dashboard: SMS link, SMS channel and change-request label', () => {
+  const status = load('src/app/admin/(panel)/invitations/_components/status.ts')
+  assert.equal(status.smsLink('+63 917 123 4567', 'Hi Maria! Link: https://x.test/i/abc?d=1&e=2'), 'sms:+639171234567?&body=Hi%20Maria!%20Link%3A%20https%3A%2F%2Fx.test%2Fi%2Fabc%3Fd%3D1%26e%3D2')
+  assert.equal(status.channelLabel('sms'), 'SMS')
+  assert.equal(status.eventLabel('shared', 'sms'), 'Marked as sent via SMS')
+  assert.equal(status.eventLabel('change_requested', null, JSON.stringify({ note: 'Add one seat' })), 'Guest asked for a change: “Add one seat”')
+  assert.equal(status.eventLabel('change_requested', null, '{bad json'), 'Guest asked for a change')
+  assert.equal(adminSchemas.updateInputSchema.parse({ action: 'shared', id: 1, channel: 'sms' }).channel, 'sms')
+})
+
+test('admin: one shell, seven areas, no leftovers from the old panel', () => {
+  const shell = fs.readFileSync(path.join(root, 'src/app/admin/_ui/AdminShell.tsx'), 'utf8')
+  for (const area of ['invitations', 'rsvps', 'settings', 'gallery', 'story', 'faq', 'quiz']) {
+    assert.ok(shell.includes(`/admin/${area}`), area)
+    assert.ok(fs.existsSync(path.join(root, 'src/app/admin/(panel)', area, 'page.tsx')), area + ' page exists')
+  }
+  assert.ok(!shell.includes('/admin/guests'))
+  for (const gone of ['src/app/admin/_components/AdminPanel.tsx', 'src/app/admin/_components/GuestListTab.tsx']) assert.ok(!fs.existsSync(path.join(root, gone)), gone)
+  const layout = fs.readFileSync(path.join(root, 'src/app/admin/(panel)/layout.tsx'), 'utf8')
+  assert.match(layout, /if \(!await isAdminSession\(\)\) redirect\('\/admin\/login'\)/, 'every admin area is behind the session check')
+  const settings = fs.readFileSync(path.join(root, 'src/app/admin/(panel)/settings/_components/SettingsView.tsx'), 'utf8')
+  assert.ok(!/rsvpAccessMode|Access Mode/.test(settings), 'the RSVP access setting is gone from the admin')
+  const files = []
+  const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else if (/\.tsx?$/.test(entry.name)) files.push(full) } }
+  walk(path.join(root, 'src/app/admin'))
+  for (const file of files) assert.ok(fs.readFileSync(file, 'utf8').split('\n').length <= 400, path.relative(root, file) + ' is over 400 lines')
 })

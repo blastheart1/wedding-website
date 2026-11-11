@@ -44,6 +44,11 @@ export const lookupDeps: LookupDeps = {
     return (await sendInvitationEmailById(invitationId, { resend: true })).sent
   },
 
+  async requestChange(invitationId, note, now) {
+    await getInviteDb().update(invitations).set({ linkRequestedAt: now }).where(eq(invitations.id, invitationId))
+    await inviteStore.recordEvent(invitationId, 'change_requested', null, JSON.stringify({ note }))
+  },
+
   async requestLink(invitationId, now) {
     await getInviteDb().update(invitations).set({ linkRequestedAt: now }).where(eq(invitations.id, invitationId))
     await inviteStore.recordEvent(invitationId, 'link_requested')

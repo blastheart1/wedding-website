@@ -13,11 +13,12 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "npm run test:ui && npm run test:rsvp && npm run test:cms && npm run test:invitations",
+    "test": "npm run test:ui && npm run test:rsvp && npm run test:cms && npm run test:invitations && npm run test:site",
     "test:ui": "node scripts/test-ui.cjs",
     "test:rsvp": "node --test scripts/test-rsvp.cjs",
     "test:cms": "node scripts/test-cms.cjs",
     "test:invitations": "node --test scripts/test-invitations.cjs",
+    "test:site": "node --test scripts/test-site.cjs",
     "check:infrastructure": "node scripts/check-infrastructure.cjs",
     "validate": "npm run test && npm run lint && npm run typecheck && npm run build"
   },

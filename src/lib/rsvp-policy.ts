@@ -1,38 +1,8 @@
-import { z } from 'zod'
-import type { GuestVerification } from '@/types'
-
-/** Shared by both endpoints so the form gate cannot bypass server-side policy. */
-export const emailSchema = z.string().trim().toLowerCase().email('Please enter a valid email').max(255)
-
-export const rsvpSchema = z.object({
-  name: z.string().trim().min(2, 'Name must be at least 2 characters').max(255),
-  email: emailSchema,
-  attending: z.enum(['yes', 'no']),
-  dietary: z.string().trim().max(500).optional(),
-  songRequest: z.string().trim().max(255).optional(),
-  message: z.string().trim().max(2000).optional(),
-})
-
-type Guest = { status: string; seats: number; name: string | null } | null
-
-export function rsvpEligibility(guest: Guest, alreadyResponded: boolean, accessMode: string): GuestVerification {
-  if (alreadyResponded) return { allowed: false, seats: null, name: null, reason: 'already_rsvped' }
-  if (guest?.status === 'block') return { allowed: false, seats: null, name: null, reason: 'blocked' }
-  if (guest?.status === 'allow') {
-    return { allowed: true, seats: guest.seats, name: guest.name ?? null }
-  }
-  // Unknown modes fail closed rather than silently opening invitations.
-  if (accessMode !== 'open' && accessMode !== 'mixed') {
-    return { allowed: false, seats: null, name: null, reason: 'not_invited' }
-  }
-  return { allowed: true, seats: null, name: null }
-}
-
-export const denialMessages = {
-  blocked: "We're unable to process your RSVP. Please contact us directly.",
-  not_invited: 'This event is by invitation only. Please contact us if you believe this is an error.',
-  already_rsvped: "You've already RSVPed with this email. Contact us if you need to make changes.",
-}
+/**
+ * RSVPs are made only through a guest's personal invitation link. The earlier
+ * open email form and its endpoints are closed; this message is what they answer.
+ */
+export const RSVP_BY_INVITATION = 'RSVPs are by personal invitation. Please open the link we sent you, or check your invitation from the RSVP button on the site.'
 
 /**
  * Best-effort per-process abuse protection, not distributed identity verification.
