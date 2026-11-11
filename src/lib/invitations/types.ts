@@ -39,7 +39,7 @@ export interface InviteStore {
 export type InviteEventType =
   | 'created' | 'email_sent' | 'email_failed' | 'email_delivered' | 'email_bounced'
   | 'shared' | 'opened' | 'responded' | 'updated' | 'revoked' | 'restored'
-  | 'regenerated' | 'link_requested' | 'edited'
+  | 'regenerated' | 'link_requested' | 'change_requested' | 'edited'
 
 /** What the guest page shows. Plain JSON so it can cross the server/client boundary. */
 export interface InviteView {

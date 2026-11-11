@@ -12,7 +12,6 @@ export function WeddingJourney({config}:{config:PublicConfig}){
  useMotionValueEvent(scrollYProgress,'change',p=>setProgress(p))
  const feedback=journeyFeedback(progress),stage=feedback.stage
  const advance=()=>{const el=ref.current;if(!el)return;const rect=el.getBoundingClientRect();window.scrollTo({top:window.scrollY+rect.top+journeyAdvanceOffset(scrollYProgress.get(),rect.height,window.innerHeight),behavior:reduced?'auto':'smooth'})}
- const exit=()=>{const el=ref.current;if(!el)return;const rect=el.getBoundingClientRect();window.scrollTo({top:window.scrollY+rect.bottom,behavior:reduced?'auto':'smooth'})}
  const[unavailable,setUnavailable]=useState(false)
  useEffect(()=>{const update=()=>setUnavailable(document.documentElement.classList.contains('world-unavailable')||document.documentElement.classList.contains('characters-unavailable'));update();window.addEventListener('wedding-world-unavailable',update);return()=>window.removeEventListener('wedding-world-unavailable',update)},[])
  const shown=reduced||unavailable?2:stage
@@ -27,8 +26,6 @@ export function WeddingJourney({config}:{config:PublicConfig}){
     </AnimatePresence>
    </div>
    {!reduced&&!unavailable&&<JourneyFeedback progress={progress} onAdvance={advance}/>}
-   {!reduced&&!unavailable&&shown!==2&&<button type="button" className="journey-skip-story text-link" onClick={exit}>Skip story ↓</button>}
-   {shown!==2&&<button type="button" className="journey-rsvp-now text-link" onClick={openWeddingRsvp}>RSVP now</button>}
   </div>
  </section>
 }

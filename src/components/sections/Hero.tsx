@@ -156,10 +156,12 @@ export function Hero({ config }: HeroProps) {
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={reduced ? {duration:0} : { duration: 0.7, delay: 0.85, ease }}
-            className="flex gap-4 justify-center flex-wrap"
+            className="flex justify-center"
           >
+            {/* Equal columns: the RSVP button always matches the width of the story button. */}
+            <div className="inline-grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button type="button" onClick={openWeddingRsvp}
-              className="inline-flex items-center justify-center border border-white/50 text-white text-[16px] tracking-[2px] uppercase font-medium px-8 py-[14px] rounded-sm hover:bg-white/10 transition-colors"
+              className="flex w-full items-center justify-center border border-white/50 text-white text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm hover:bg-white/10 transition-colors"
             >
               RSVP
             </button>
@@ -167,7 +169,7 @@ export function Hero({ config }: HeroProps) {
             {hasVideo ? (
               <button
                 onClick={openModal}
-                className={`flex items-center gap-3 text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
+                className={`flex w-full items-center justify-center gap-3 whitespace-nowrap text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
               >
                 {/* Play icon */}
                 <span className={`flex items-center justify-center w-5 h-5 rounded-full border ${hasVideo ? 'border-white/60' : 'border-ink/40'}`}>
@@ -180,11 +182,12 @@ export function Hero({ config }: HeroProps) {
             ) : (
               <a
                 href="#story"
-                className={`inline-flex items-center justify-center text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
+                className={`flex w-full items-center justify-center whitespace-nowrap text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
               >
                 Our Story
               </a>
             )}
+            </div>
           </motion.div>
         </div>
 

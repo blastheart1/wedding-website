@@ -15,6 +15,7 @@ export default async function FindPage() {
     <FindStatus
       couple={{ partner1: config.partner1, partner2: config.partner2 }}
       contactEmail={config.presentation.footerContactEmail}
+      deadline={config.rsvpDeadline}
     />
   )
 }

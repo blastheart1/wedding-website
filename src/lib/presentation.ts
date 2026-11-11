@@ -25,6 +25,8 @@ export const sitePresentationSchema = z.object({
   receptionNote: z.string().max(2000),
   footerContactEmail: z.union([z.literal(''), z.string().email().max(255)]),
   footerContactUrl: httpsUrl,
+  // The quiz and bouquet games are hidden unless the couple turns them on.
+  showGames: z.boolean(),
   ceremonyImages: z.array(z.object({ src: imageUrl, alt: z.string().max(500), label: z.string().max(100) }).strict()).max(12),
 }).strict()
 export type SitePresentation = z.infer<typeof sitePresentationSchema>
@@ -40,6 +42,7 @@ export const DEFAULT_PRESENTATION: SitePresentation = {
   receptionNote: 'Details may be shared on the wedding day.',
   footerContactEmail: 'antonioluis.santos1@gmail.com',
   footerContactUrl: 'https://codebyluis.dev',
+  showGames: false,
   ceremonyImages: [
     { src: '/wedding/church-1.jpg', alt: 'Front view of Old Bosoboso Church, framed by trees', label: 'The church' },
     { src: '/wedding/church-2.jpg', alt: 'Stone façade and entrance of Old Bosoboso Church', label: 'The façade' },

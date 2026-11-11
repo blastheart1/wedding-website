@@ -5,7 +5,9 @@ import { Toaster } from 'sonner'
 export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
-  themeColor:   '#C96070',
+  // Cream, matching the page. The home page keeps this in step with the section on screen
+  // (see StatusBarColor), so the phone status bar never shows a mismatched band.
+  themeColor:   '#FDFAF6',
 }
 
 export const metadata: Metadata = {

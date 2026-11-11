@@ -45,7 +45,8 @@ function FlipDigit({ value, reduced }: { value: string, reduced: boolean }) {
 export function Countdown({ config, heading = DEFAULT_SECTION_HEADINGS.countdown }: CountdownProps) {
   const { weddingDate, ceremonyTime } = config
   const {reduced,paused}=useWorldMotion()
-  const [nightMode,setNightMode]=useState<NightMode>('stargaze')
+  // The scene switcher was removed; the couple stay stargazing.
+  const nightMode: NightMode = 'stargaze'
   useEffect(()=>{window.dispatchEvent(new Event('wedding-world-control'))},[nightMode])
 
   const [values, setValues] = useState<CountdownValues>(() =>
@@ -112,13 +113,9 @@ export function Countdown({ config, heading = DEFAULT_SECTION_HEADINGS.countdown
         ))}
       </motion.div>
       </div>
-      <div id="countdown-night-scene" className="countdown-world scene-viewport" data-wedding-scene="night" data-night-mode={nightMode} role="img" aria-label={nightMode==='dance'?`${config.partner1} and ${config.partner2} dance together beneath the moon and stars.`:`${config.partner1} and ${config.partner2} sit together beneath the moon and stars.`}><div className="world-canvas-slot" aria-hidden="true" /></div>
+      <div id="countdown-night-scene" className="countdown-world scene-viewport" data-wedding-scene="night" data-night-mode={nightMode} role="img" aria-label={`${config.partner1} and ${config.partner2} sit together beneath the moon and stars.`}><div className="world-canvas-slot" aria-hidden="true" /></div>
       <p className="night-scene-caption">Together under the stars</p>
-      <div className="night-scene-options" role="group" aria-label="Choose the couple’s night scene" aria-controls="countdown-night-scene">
-        <button type="button" aria-pressed={nightMode==='stargaze'} onClick={()=>setNightMode('stargaze')}>Stargazing</button>
-        <button type="button" aria-pressed={nightMode==='dance'} onClick={()=>setNightMode('dance')}>Dancing</button>
-      </div>
-      <span className="sr-only" role="status">{nightMode==='dance'?'Dancing scene selected.':'Stargazing scene selected.'} {reduced?'Reduced motion: a still pose is shown.':paused?'Motion is paused.':''}</span>
+      <span className="sr-only" role="status">{reduced?'Reduced motion: a still pose is shown.':paused?'Motion is paused.':''}</span>
     </section>
   )
 }
