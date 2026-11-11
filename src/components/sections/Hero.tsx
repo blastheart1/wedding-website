@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import {openWeddingRsvp} from '@/lib/rsvp-dialog'
+
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import {useWorldMotion} from '@/lib/site-motion'
+import {backgrounds} from '@/extra-assets'
 import type { PublicConfig } from '@/lib/config'
 
 interface HeroProps {
@@ -26,7 +30,16 @@ export function Hero({ config }: HeroProps) {
   const displayDate  = formatWeddingDate(weddingDate)
   const hasVideo     = !!heroVideoUrl
   const hasBgImage   = !hasVideo && !!heroBgUrl
+  const {reduced} = useWorldMotion()
+  const backgroundRef = useRef<HTMLVideoElement>(null)
   const [modal, setModal] = useState(false)
+  useEffect(() => {
+    const video=backgroundRef.current
+    if(!video)return
+    if(reduced){video.pause();return}
+    video.play().then(()=>{if(document.documentElement.dataset.siteMotion==='reduced')video.pause()}).catch(()=>{})
+  }, [reduced])
+  useEffect(() => { if (!modal) return; const prior = document.activeElement as HTMLElement; const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setModal(false) }; document.addEventListener('keydown',handler); const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.removeEventListener('keydown',handler);document.body.style.overflow=old;prior?.focus()} },[modal])
   const modalVideoRef     = useRef<HTMLVideoElement>(null)
 
   const openModal  = () => setModal(true)
@@ -38,10 +51,10 @@ export function Hero({ config }: HeroProps) {
   // Text colours flip based on whether video or bg image (dark overlay) is present
   const hasDarkBg      = hasVideo || hasBgImage
   const textColor      = hasDarkBg ? 'text-white'        : 'text-ink'
-  const subTextColor   = hasDarkBg ? 'text-white/70'     : 'text-muted'
+  const subTextColor   = hasDarkBg ? 'text-white'     : 'text-muted'
   const roseNameColor  = hasDarkBg ? 'text-blush'        : 'text-rose'
   const ornamentColor  = hasDarkBg ? 'bg-white/40'       : 'bg-blush'
-  const dateColor      = hasDarkBg ? 'text-white/80'     : 'text-ink2'
+  const dateColor      = hasDarkBg ? 'text-white'     : 'text-ink2'
   const ghostBtnClass  = hasDarkBg
     ? 'border border-white/50 text-white hover:bg-white/10'
     : 'border border-rule text-ink hover:bg-petal hover:border-ink2'
@@ -58,12 +71,15 @@ export function Hero({ config }: HeroProps) {
         {hasVideo ? (
           <video
             key={heroVideoUrl}
-            autoPlay
+            poster={backgrounds.storyBgUrl}
+            ref={backgroundRef}
+            autoPlay={!reduced}
             muted
             loop
             playsInline
             preload="auto"
             className="absolute inset-0 w-full h-full object-cover"
+            aria-hidden="true"
             src={heroVideoUrl}
           />
         ) : hasBgImage ? (
@@ -81,23 +97,23 @@ export function Hero({ config }: HeroProps) {
 
         {/* Dark overlay for video readability */}
         {hasVideo && (
-          <div className="absolute inset-0 bg-gradient-to-b from-ink/50 via-ink/35 to-ink/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/55 to-black/65" />
         )}
 
         {/* ── Content ──────────────────────────────────────────────────── */}
         <div className="relative z-10 text-center px-6 max-w-2xl mx-auto">
 
           <motion.p
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease }}
-            className={`text-[10px] tracking-[6px] uppercase mb-6 ${subTextColor}`}
+            initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={reduced ? {duration:0} : { duration: 0.8, delay: 0.2, ease }}
+            className={`text-[16px] tracking-[3px] uppercase mb-6 ${subTextColor}`}
           >
             Together forever
           </motion.p>
 
           <motion.h1
-            initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.95, delay: 0.38, ease }}
+            initial={reduced ? false : { opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }}
+            transition={reduced ? {duration:0} : { duration: 0.95, delay: 0.38, ease }}
             className={`font-display font-light leading-[0.95] mb-6 ${textColor}`}
             style={{ fontSize: 'clamp(64px, 10vw, 120px)' }}
           >
@@ -107,12 +123,12 @@ export function Hero({ config }: HeroProps) {
 
           {/* Ornament + date */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.55, ease }}
+            initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={reduced ? {duration:0} : { duration: 0.8, delay: 0.55, ease }}
             className="flex items-center justify-center gap-5 mb-2"
           >
             <span className={`block w-11 h-px ${ornamentColor}`} />
-            <span className={`font-display text-[19px] font-light italic tracking-[2px] ${dateColor}`}>
+            <span className={`font-display text-[27px] font-light italic tracking-[2px] ${dateColor}`}>
               {displayDate}
             </span>
             <span className={`block w-11 h-px ${ornamentColor}`} />
@@ -120,39 +136,38 @@ export function Hero({ config }: HeroProps) {
 
           {location && location !== 'TBA' && (
             <motion.p
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.65, ease }}
-              className={`text-[11px] tracking-[3px] uppercase mb-2 ${subTextColor}`}
+              initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }}
+              transition={reduced ? {duration:0} : { duration: 0.7, delay: 0.65, ease }}
+              className={`text-[16px] tracking-[3px] uppercase mb-2 ${subTextColor}`}
             >
               {location}
             </motion.p>
           )}
 
           <motion.p
-            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.7, ease }}
-            className={`text-[10px] tracking-[5px] uppercase mb-11 ${subTextColor}`}
+            initial={reduced ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={reduced ? {duration:0} : { duration: 0.7, delay: 0.7, ease }}
+            className={`text-[16px] tracking-[3px] uppercase mb-11 ${subTextColor}`}
           >
             Save the Date
           </motion.p>
 
           {/* CTAs */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.85, ease }}
+            initial={reduced ? false : { opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={reduced ? {duration:0} : { duration: 0.7, delay: 0.85, ease }}
             className="flex gap-4 justify-center flex-wrap"
           >
-            <a
-              href="#rsvp"
-              className="inline-flex items-center justify-center bg-rose text-white text-[10px] tracking-[3px] uppercase font-medium px-8 py-[14px] rounded-sm hover:bg-rosedark transition-colors"
+            <button type="button" onClick={openWeddingRsvp}
+              className="inline-flex items-center justify-center border border-white/50 text-white text-[16px] tracking-[2px] uppercase font-medium px-8 py-[14px] rounded-sm hover:bg-white/10 transition-colors"
             >
               RSVP
-            </a>
+            </button>
 
             {hasVideo ? (
               <button
                 onClick={openModal}
-                className={`flex items-center gap-3 text-[10px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
+                className={`flex items-center gap-3 text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
               >
                 {/* Play icon */}
                 <span className={`flex items-center justify-center w-5 h-5 rounded-full border ${hasVideo ? 'border-white/60' : 'border-ink/40'}`}>
@@ -165,7 +180,7 @@ export function Hero({ config }: HeroProps) {
             ) : (
               <a
                 href="#story"
-                className={`inline-flex items-center justify-center text-[10px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
+                className={`inline-flex items-center justify-center text-[16px] tracking-[3px] uppercase px-8 py-[14px] rounded-sm transition-colors ${ghostBtnClass}`}
               >
                 Our Story
               </a>
@@ -175,17 +190,17 @@ export function Hero({ config }: HeroProps) {
 
         {/* ── Scroll cue ─────────────────────────────────────────────────── */}
         <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          transition={{ delay: 1.4, duration: 0.8 }}
+          initial={reduced ? false : { opacity: 0 }} animate={{ opacity: 1 }}
+          transition={reduced ? {duration:0} : { delay: 1.4, duration: 0.8 }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
         >
           <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+            animate={reduced ? {y:0} : { y: [0, 6, 0] }}
+            transition={{ repeat: reduced ? 0 : Infinity, duration: reduced ? 0 : 1.8, ease: 'easeInOut' }}
             className="flex flex-col items-center gap-2"
           >
             <div className={`w-px h-8 ${hasVideo ? 'bg-white/30' : 'bg-rule'}`} />
-            <span className={`text-[9px] tracking-[3px] uppercase ${subTextColor}`}>Scroll</span>
+            <span className={`text-[14px] tracking-[3px] uppercase ${subTextColor}`}>Scroll</span>
           </motion.div>
         </motion.div>
       </section>
@@ -194,27 +209,28 @@ export function Hero({ config }: HeroProps) {
       <AnimatePresence>
         {modal && (
           <motion.div
-            key="video-modal"
-            initial={{ opacity: 0 }}
+            key="video-modal" role="dialog" aria-modal="true" aria-label="Our story video"
+            initial={reduced ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={reduced ? {duration:0} : { duration: 0.3 }}
             className="fixed inset-0 z-[950] flex items-center justify-center bg-ink/95 backdrop-blur-md p-4 md:p-8"
             onClick={closeModal}
           >
             <motion.div
-              initial={{ scale: 0.93, opacity: 0 }}
+              initial={reduced ? false : { scale: 0.93, opacity: 0 }}
               animate={{ scale: 1,    opacity: 1 }}
               exit={{    scale: 0.93, opacity: 0 }}
-              transition={{ duration: 0.35, ease }}
+              transition={reduced ? {duration:0} : { duration: 0.35, ease }}
               className="relative w-full max-w-5xl"
               onClick={e => e.stopPropagation()}
             >
               {/* Close button */}
               <button
                 onClick={closeModal}
+                autoFocus
                 aria-label="Close video"
-                className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors text-[11px] tracking-[2px] uppercase flex items-center gap-2"
+                className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors text-[16px] tracking-[2px] uppercase flex items-center gap-2"
               >
                 <span>Close</span>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

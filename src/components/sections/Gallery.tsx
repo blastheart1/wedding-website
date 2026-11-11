@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  motion, useScroll, useTransform, useSpring, useInView, AnimatePresence,
+  motion, useScroll, useTransform, useSpring, AnimatePresence,
   type MotionValue,
 } from 'framer-motion'
 import { SectionHeader }          from '@/components/ui/SectionHeader'
@@ -12,17 +12,19 @@ import { fadeIn }                  from '@/lib/animations'
 import type { GalleryPhotoData, SectionHeading } from '@/types'
 import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 import clsx from 'clsx'
+import {scrollingSideFlowersEnabled} from '@/lib/visual-settings'
+import {useWorldMotion} from '@/lib/site-motion'
 
 // ─── Gallery flower overlay — fixed-position, scroll-driven ──────────────────
 // Each flower pops in at a different scrollYProgress threshold so they
 // appear one-by-one as the user scrolls through the instax stack.
 const GALLERY_OVERLAY_FLOWERS = [
-  { src: '/flowers/home-petals-left.png',   style: { left: '1vw',   bottom: '22vh', width: 'clamp(90px,11vw,160px)'  }, threshold: [0.12, 0.18] as [number,number], rotate: -8  },
-  { src: '/flowers/s2-flower-right.png',    style: { right: '1vw',  bottom: '28vh', width: 'clamp(100px,13vw,180px)' }, threshold: [0.28, 0.34] as [number,number], rotate: 10  },
-  { src: '/flowers/s2-lily-right.png',      style: { right: '2vw',  bottom: '8vh',  width: 'clamp(110px,14vw,200px)' }, threshold: [0.44, 0.50] as [number,number], rotate: -6  },
-  { src: '/flowers/s3-flower-left.png',     style: { left: '2vw',   bottom: '10vh', width: 'clamp(100px,13vw,185px)' }, threshold: [0.60, 0.66] as [number,number], rotate: 7   },
-  { src: '/flowers/s2-petals-right.png',    style: { right: '3vw',  bottom: '44vh', width: 'clamp(70px, 9vw, 130px)' }, threshold: [0.74, 0.80] as [number,number], rotate: -10 },
-  { src: '/flowers/home-flowers-left.png',  style: { left: '-4.5vw', bottom: '38vh', width: 'clamp(110px,15vw,200px)' }, threshold: [0.84, 0.90] as [number,number], rotate: 5   },
+  { src: '/flowers/home-petals-left.png',   style: { left: '-2vw',   bottom: '22vh', width: 'clamp(90px,11vw,160px)'  }, threshold: [0.12, 0.18] as [number,number], rotate: -8, mirror: false },
+  { src: '/flowers/s2-flower-right.png',    style: { right: '-2vw',  bottom: '28vh', width: 'clamp(100px,13vw,180px)' }, threshold: [0.28, 0.34] as [number,number], rotate: 18, mirror: false },
+  { src: '/flowers/s2-lily-right.png',      style: { right: '2vw',  bottom: '8vh',  width: 'clamp(110px,14vw,200px)' }, threshold: [0.44, 0.50] as [number,number], rotate: -6, mirror: false },
+  { src: '/flowers/s3-flower-left.png',     style: { left: '-3vw',   bottom: '10vh', width: 'clamp(100px,13vw,185px)' }, threshold: [0.60, 0.66] as [number,number], rotate: -12, mirror: true },
+  { src: '/flowers/s2-petals-right.png',    style: { right: '3vw',  bottom: '44vh', width: 'clamp(70px, 9vw, 130px)' }, threshold: [0.74, 0.80] as [number,number], rotate: -10, mirror: false },
+  { src: '/flowers/home-flowers-left.png',  style: { left: '-4.5vw', bottom: '38vh', width: 'clamp(110px,15vw,200px)' }, threshold: [0.84, 0.90] as [number,number], rotate: 16, mirror: false },
 ]
 
 function GalleryFlowers({
@@ -51,7 +53,7 @@ function GalleryFlowers({
         // eslint-disable-next-line react-hooks/rules-of-hooks
         const scale      = useTransform(rawOpacity, [0, 1], [0.72, 1])
         // eslint-disable-next-line react-hooks/rules-of-hooks
-        const rotate     = useTransform(rawOpacity, [0, 1], [f.rotate * 2, 0])
+        const rotate     = useTransform(rawOpacity, [0, 1], [f.rotate * 2, f.rotate])
 
         return (
           <motion.div
@@ -62,6 +64,7 @@ function GalleryFlowers({
               zIndex: 5,
               opacity,
               scale,
+              scaleX: f.mirror ? -1 : 1,
               rotate,
               y: exitY,  // sweep upward in lockstep with the section
               ...f.style,
@@ -69,7 +72,7 @@ function GalleryFlowers({
           >
             <Image
               src={f.src}
-              alt="Decorative flower"
+              alt=""
               width={300}
               height={300}
               style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
@@ -109,6 +112,7 @@ function StackCard({
   scrollYProgress: MotionValue<number>
   onClick?:     () => void
 }) {
+  const {reduced}=useWorldMotion()
   const rotation = ROTATIONS[index % ROTATIONS.length]
 
   // +1 denominator adds a "rest" period at the end where all cards are stacked
@@ -123,7 +127,7 @@ function StackCard({
   const y = useTransform(
     scrollYProgress,
     [0, yRangeStart, entryMid, 1],
-    ['115%', '115%', '0%', '0%'],
+    index === 0 ? ['0%', '0%', '0%', '0%'] : ['125%', '125%', '0%', '0%'],
   )
 
   // Older cards scale down as newer ones stack on top
@@ -138,15 +142,18 @@ function StackCard({
 
   return (
     <motion.div
-      style={{ y, scale, rotate: rotation, zIndex: index + 1 }}
+      style={{ y:reduced?0:y, scale:reduced?1:scale, rotate:reduced?0:rotation, zIndex: index + 1 }}
       className="absolute inset-0 flex items-center justify-center"
       onClick={onClick}
+      role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Open photograph ${index + 1}` : undefined}
+      onKeyDown={e => { if (onClick && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onClick() } }}
     >
       <motion.div
-        whileHover={onClick ? { y: -10, boxShadow: '0 24px 60px rgba(46,31,26,0.22)' } : undefined}
-        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+        whileHover={onClick&&!reduced ? { y: -10, boxShadow: '0 24px 60px rgba(46,31,26,0.22)' } : undefined}
+        transition={{ duration: reduced?0:0.22, ease: [0.22, 1, 0.36, 1] }}
         className={clsx(
-          'bg-white p-3 pb-14 w-[210px] sm:w-[312px]',
+          'gallery-instax bg-white p-3 pb-10 w-[280px] sm:w-[440px]' ,
           'shadow-[0_8px_40px_rgba(46,31,26,0.14)]',
           onClick && 'cursor-pointer select-none',
         )}
@@ -157,7 +164,7 @@ function StackCard({
               src={photo.url}
               alt={photo.caption ?? `Photo ${index + 1}`}
               fill
-              sizes="(max-width: 640px) 210px, 312px"
+              sizes="(max-width: 640px) 280px, 440px"
               className="object-cover"
             />
           </div>
@@ -170,7 +177,7 @@ function StackCard({
           </div>
         )}
         {photo?.caption && (
-          <p className="font-display italic text-ink2 text-[12px] text-center mt-2 leading-snug">
+          <p className="font-display italic text-ink2 text-[16px] text-center mt-2 leading-snug">
             {photo.caption}
           </p>
         )}
@@ -181,6 +188,7 @@ function StackCard({
 
 // ─── Animated scroll hint (fades out as stack begins) ─────────────────────────
 function ScrollHint({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
+  const {reduced}=useWorldMotion()
   const opacity = useTransform(scrollYProgress, [0, 0.12], [1, 0])
   return (
     <motion.div
@@ -188,12 +196,12 @@ function ScrollHint({ scrollYProgress }: { scrollYProgress: MotionValue<number> 
       className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-20"
     >
       <motion.div
-        animate={{ y: [0, 8, 0] }}
-        transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+        animate={reduced?{y:0}:{ y: [0, 8, 0] }}
+        transition={{ repeat: reduced?0:Infinity, duration: reduced?0:1.8, ease: 'easeInOut' }}
         className="flex flex-col items-center gap-2"
       >
         <div className="w-px h-11 bg-ink/20" />
-        <span className="text-[12px] tracking-[4px] uppercase text-muted">Scroll to stack</span>
+        <span className="text-[16px] tracking-[4px] uppercase text-muted">Scroll to stack</span>
       </motion.div>
     </motion.div>
   )
@@ -222,18 +230,21 @@ function StackProgress({
 
 // ─── Main Gallery ─────────────────────────────────────────────────────────────
 export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: { bgUrl?: string; heading?: SectionHeading }) {
+  const {reduced}=useWorldMotion()
   const [photos,   setPhotos]   = useState<GalleryPhotoData[]>([])
-  const [loading,  setLoading]  = useState(true)
+  const [loading,  setLoading]  = useState(false)
   const [lightbox, setLightbox] = useState<number | null>(null)
 
   useEffect(() => {
-    fetch('/api/gallery', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => setPhotos(j.photos ?? []))
-      .catch(() => setPhotos([]))
-      .finally(() => setLoading(false))
+    const controller = new AbortController()
+    fetch('/api/gallery', { cache: 'no-store', signal: controller.signal })
+      .then(res => { if (!res.ok) throw new Error('Photos unavailable'); return res.json() })
+      .then(data => { if (Array.isArray(data)) setPhotos(data); else if (Array.isArray(data.photos)) setPhotos(data.photos) })
+      .catch(() => { /* Keep the accessible empty-state when media is unavailable. */ })
+    return () => controller.abort()
   }, [])
 
+  useEffect(() => { if (lightbox === null) return; const prior=document.activeElement as HTMLElement; const old=document.body.style.overflow;document.body.style.overflow='hidden';const handler=(e:KeyboardEvent)=>{if(e.key==='Escape')setLightbox(null);if(e.key==='ArrowRight')setLightbox(i=>i===null?null:Math.min(photos.length-1,i+1));if(e.key==='ArrowLeft')setLightbox(i=>i===null?null:Math.max(0,i-1))};document.addEventListener('keydown',handler);return()=>{document.body.style.overflow=old;document.removeEventListener('keydown',handler);prior?.focus()} },[lightbox,photos.length])
   const trackRef = useRef<HTMLElement>(null)
 
   // 0→1 during the sticky phase only (end end = section bottom at viewport bottom)
@@ -249,7 +260,6 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
     offset: ['start start', 'end start'],
   })
 
-  const bottleInView = useInView(trackRef, { once: true, amount: 0.05 })
 
   const hasPhotos = !loading && photos.length > 0
   // Show at most 10 photos in the stack; beyond that still loads in gallery grid
@@ -264,11 +274,11 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
   return (
     <>
       {/* Fixed flower overlays — appear one-by-one, exit with the section */}
-      <GalleryFlowers
+      {scrollingSideFlowersEnabled&&<GalleryFlowers
         scrollYProgress={scrollYProgress}
         scrollOffscreen={scrollOffscreen}
-        stickyEndFraction={total / (total + 1)}
-      />
+        stickyEndFraction={1 - 1 / ((total + 1) * .65)}
+      />}
 
       {/*
        * ── Sticky scroll stack ──────────────────────────────────────────────
@@ -283,30 +293,14 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
       <section
         id="gallery"
         ref={trackRef}
-        style={{ height: `${(total + 1) * 100}svh` }}
-        className="relative"
+        style={{ height: `${(total + 1) * 65}svh` }}
+        className={`relative${reduced?' gallery-reduced':''}`}
       >
         <div className="sticky top-0 h-[100svh] min-h-0 relative flex flex-col overflow-hidden">
           <SectionBackground imageUrl={bgUrl} fallbackColor="bg-sage" overlayClass="bg-white/20" />
 
-          {/* Champagne bottle — lower-left, behind all instax cards (z-index 0) */}
-          <motion.div
-            initial={{ opacity: 0, x: -80, y: 40, rotate: -18 }}
-            animate={bottleInView ? { opacity: 1, x: 0, y: 0, rotate: -6 } : {}}
-            transition={{ duration: 1.0, delay: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-            style={{ position: 'absolute', bottom: '-18%', left: '-12%', width: 'clamp(780px, 120vw, 1400px)', zIndex: 0 }}
-          >
-            <Image
-              src="/champagne-bottle.png"
-              alt="Champagne bottle"
-              width={600}
-              height={1000}
-              style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
-            />
-          </motion.div>
-
           {/* Section header — visible at top of sticky viewport */}
-          <div className="relative z-10 shrink-0 pt-16 pb-4">
+          <div className="relative z-10 shrink-0 pt-28 pb-0">
             <SectionHeader
               eyebrow={heading.eyebrow}
               heading={heading.heading}
@@ -315,7 +309,7 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
           </div>
 
           {/* Stack arena — cards positioned absolutely inside here */}
-          <div className="relative z-10 flex-1 min-h-0 min-w-0">
+          <div className="gallery-arena relative z-10 flex-1 min-h-0 min-w-0 pb-14">
             {stackItems.map((item, i) =>
               hasPhotos ? (
                 <StackCard
@@ -338,8 +332,8 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
             )}
           </div>
 
-          <ScrollHint scrollYProgress={scrollYProgress} />
-          <StackProgress total={total} scrollYProgress={scrollYProgress} />
+          {!reduced&&<ScrollHint scrollYProgress={scrollYProgress} />}
+          {!reduced&&<StackProgress total={total} scrollYProgress={scrollYProgress} />}
         </div>
       </section>
 
@@ -347,27 +341,27 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
       <AnimatePresence>
         {lightboxPhoto && (
           <motion.div
-            key="lightbox"
-            variants={fadeIn}
-            initial="hidden"
+            key="lightbox" role="dialog" aria-modal="true" aria-label="Wedding photograph" data-photo-lightbox
+            variants={reduced?{hidden:{opacity:1},visible:{opacity:1,transition:{duration:0}}}:fadeIn}
+            initial={reduced?false:"hidden"}
             animate="visible"
             exit="hidden"
             className="fixed inset-0 bg-ink/92 z-[950] flex items-center justify-center p-4 md:p-8"
             onClick={() => setLightbox(null)}
           >
             <motion.div
-              initial={{ scale: 0.93, opacity: 0 }}
+              initial={reduced?false:{ scale: 0.93, opacity: 0 }}
               animate={{ scale: 1,    opacity: 1 }}
               exit={{    scale: 0.93, opacity: 0 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: reduced?0:0.35, ease: [0.22, 1, 0.36, 1] }}
               className="relative max-w-2xl w-full"
               onClick={e => e.stopPropagation()}
             >
               {/* Close */}
               <button
                 onClick={() => setLightbox(null)}
-                aria-label="Close"
-                className="absolute -top-10 right-0 text-white/60 hover:text-white transition-colors text-[11px] tracking-[2px] uppercase flex items-center gap-2"
+                aria-label="Close" autoFocus
+                className="absolute -top-10 right-0 text-white/90 hover:text-white transition-colors text-[16px] tracking-[2px] uppercase flex items-center gap-2"
               >
                 Close
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -398,17 +392,17 @@ export function Gallery({ bgUrl, heading = DEFAULT_SECTION_HEADINGS.gallery }: {
                   <button
                     onClick={prevPhoto}
                     disabled={lightbox === 0}
-                    className="text-white/60 hover:text-white disabled:opacity-25 transition-colors text-[10px] tracking-[2px] uppercase"
+                    className="text-white/90 hover:text-white disabled:opacity-25 transition-colors text-[16px] tracking-[2px] uppercase"
                   >
                     ← Prev
                   </button>
-                  <span className="text-white/40 text-[10px] tracking-[2px]">
+                  <span className="text-white/90 text-[16px] tracking-[2px]">
                     {(lightbox ?? 0) + 1} / {photos.length}
                   </span>
                   <button
                     onClick={nextPhoto}
                     disabled={lightbox === photos.length - 1}
-                    className="text-white/60 hover:text-white disabled:opacity-25 transition-colors text-[10px] tracking-[2px] uppercase"
+                    className="text-white/90 hover:text-white disabled:opacity-25 transition-colors text-[16px] tracking-[2px] uppercase"
                   >
                     Next →
                   </button>

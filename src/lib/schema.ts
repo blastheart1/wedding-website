@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 // ─── RSVPs ────────────────────────────────────────────────────────────────────
 export const rsvps = pgTable(
@@ -16,7 +17,8 @@ export const rsvps = pgTable(
   {
     id:          serial('id').primaryKey(),
     name:        varchar('name',         { length: 255 }).notNull(),
-    email:       varchar('email',        { length: 255 }).notNull(),
+    // Optional: guests invited by personal link may have no email on file.
+    email:       varchar('email',        { length: 255 }),
     attending:   boolean('attending').notNull(),
     // Legacy field — kept for existing data; new submissions use `dietary`
     meal:        varchar('meal',         { length: 100 }),
@@ -27,12 +29,85 @@ export const rsvps = pgTable(
     dietary:     text('dietary'),
     message:     text('message'),
     createdAt:   timestamp('created_at').defaultNow().notNull(),
+    // Personal-invitation RSVPs (all nullable; absent on legacy email RSVPs)
+    invitationId:   integer('invitation_id'),
+    // How many of the invitation's seats will be used, including the guest
+    partySize:      integer('party_size'),
+    // JSON string: string[] of additional guest names
+    companions:     text('companions'),
+    acknowledgedAt: timestamp('acknowledged_at'),
+    updatedAt:      timestamp('updated_at'),
   },
   (table) => ({
     // One RSVP per email address — enforces no double submissions at DB level
     emailUnique: uniqueIndex('rsvps_email_unique').on(table.email),
+    // One RSVP per personal invitation
+    invitationUnique: uniqueIndex('rsvps_invitation_unique').on(table.invitationId).where(sql`${table.invitationId} IS NOT NULL`),
   }),
 )
+
+// ─── Personal invitations (link + QR) ─────────────────────────────────────────
+export const invitations = pgTable(
+  'invitations',
+  {
+    id:              serial('id').primaryKey(),
+    guestName:       varchar('guest_name', { length: 255 }).notNull(),
+    email:           varchar('email', { length: 255 }),
+    // Normalised E.164, e.g. +639171234567
+    phone:           varchar('phone', { length: 32 }),
+    // Seats including the guest: 1 = solo, 3 = guest plus two
+    seats:           integer('seats').notNull().default(1),
+    // SHA-256 hex of the link token (lookup) and AES-256-GCM copy (re-display)
+    tokenHash:       varchar('token_hash', { length: 64 }).notNull(),
+    tokenEnc:        text('token_enc').notNull(),
+    // 'active' | 'revoked'
+    status:          varchar('status', { length: 20 }).notNull().default('active'),
+    guestListId:     integer('guest_list_id'),
+    sentAt:          timestamp('sent_at'),
+    lastChannel:     varchar('last_channel', { length: 20 }),
+    firstOpenedAt:   timestamp('first_opened_at'),
+    lastOpenedAt:    timestamp('last_opened_at'),
+    openCount:       integer('open_count').notNull().default(0),
+    respondedAt:     timestamp('responded_at'),
+    linkRequestedAt: timestamp('link_requested_at'),
+    createdAt:       timestamp('created_at').defaultNow().notNull(),
+    updatedAt:       timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    tokenHashUnique: uniqueIndex('invitations_token_hash_unique').on(table.tokenHash),
+    emailUnique:     uniqueIndex('invitations_email_unique').on(table.email).where(sql`${table.email} IS NOT NULL`),
+    phoneUnique:     uniqueIndex('invitations_phone_unique').on(table.phone).where(sql`${table.phone} IS NOT NULL`),
+  }),
+)
+
+export const invitationEvents = pgTable(
+  'invitation_events',
+  {
+    id:           serial('id').primaryKey(),
+    invitationId: integer('invitation_id').notNull().references(() => invitations.id, { onDelete: 'cascade' }),
+    type:         varchar('type', { length: 40 }).notNull(),
+    channel:      varchar('channel', { length: 20 }),
+    meta:         text('meta'),
+    createdAt:    timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    invitationIdx: index('invitation_events_invitation_idx').on(table.invitationId),
+  }),
+)
+
+// Single row of validated JSON: preview/email/share templates, do's and don'ts, acknowledgement
+export const inviteSettings = pgTable('invite_settings', {
+  id:        serial('id').primaryKey(),
+  data:      text('data').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// Shared (cross-instance) attempt counters for the public status lookup
+export const rateLimits = pgTable('rate_limits', {
+  key:         varchar('key', { length: 255 }).primaryKey(),
+  windowStart: timestamp('window_start').notNull(),
+  count:       integer('count').notNull().default(0),
+})
 
 // ─── FAQ Items ────────────────────────────────────────────────────────────────
 export const faqItems = pgTable('faq_items', {
@@ -155,6 +230,7 @@ export const weddingConfig = pgTable('wedding_config', {
   storyChapters:   text('story_chapters'),
   // Section heading text (JSON string: SectionHeadings) — editable from admin
   sectionHeadings: text('section_headings'),
+  sitePresentation: text('site_presentation'),
   updatedAt:       timestamp('updated_at').defaultNow().notNull(),
 })
 
@@ -172,3 +248,6 @@ export type QuizQuestion      = typeof quizQuestions.$inferSelect
 export type NewQuizQuestion   = typeof quizQuestions.$inferInsert
 export type QuizScore         = typeof quizScores.$inferSelect
 export type BouquetScore      = typeof bouquetScores.$inferSelect
+export type Invitation        = typeof invitations.$inferSelect
+export type NewInvitation     = typeof invitations.$inferInsert
+export type InvitationEvent   = typeof invitationEvents.$inferSelect

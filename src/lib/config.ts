@@ -1,9 +1,12 @@
+import { eq, getTableColumns } from 'drizzle-orm'
+import { DEFAULT_PRESENTATION, parseSitePresentation, type SitePresentation } from './presentation'
 import { getDb, schema } from './db'
 import { DEFAULT_CONFIG, STORY_CHAPTERS, DEFAULT_SECTION_HEADINGS } from './constants'
 import type { StoryChapter, SectionHeadings } from '@/types'
 
 // ─── Public shape — all fields guaranteed non-null ────────────────────────────
 export interface PublicConfig {
+  presentation: SitePresentation
   partner1:       string
   partner2:       string
   weddingDate:    string
@@ -43,11 +46,21 @@ export interface PublicConfig {
 export async function getWeddingConfig(): Promise<PublicConfig> {
   try {
     const db   = getDb()
-    const rows = await db.select().from(schema.weddingConfig).limit(1)
+    const { sitePresentation: optionalColumn, ...baseColumns } = getTableColumns(schema.weddingConfig)
+    const rows = await db.select(baseColumns).from(schema.weddingConfig).limit(1)
 
     if (rows.length > 0) {
       const row = rows[0]
+      let presentation = structuredClone(DEFAULT_PRESENTATION)
+      try {
+        const extra = await db.select({ value: optionalColumn }).from(schema.weddingConfig).where(eq(schema.weddingConfig.id, row.id)).limit(1)
+        presentation = parseSitePresentation(extra[0]?.value)
+      } catch {
+        // Optional presentation migration may be pending; retain all existing settings.
+        console.warn('Presentation unavailable; using revision-11 defaults. Check the site_presentation migration.')
+      }
       return {
+        presentation,
         partner1:       row.partner1       ?? DEFAULT_CONFIG.partner1,
         partner2:       row.partner2       ?? DEFAULT_CONFIG.partner2,
         weddingDate:    row.weddingDate    ?? DEFAULT_CONFIG.weddingDate,
@@ -80,6 +93,7 @@ export async function getWeddingConfig(): Promise<PublicConfig> {
   }
   return {
     ...DEFAULT_CONFIG,
+    presentation: structuredClone(DEFAULT_PRESENTATION),
     storyChapters:   STORY_CHAPTERS,
     sectionHeadings: DEFAULT_SECTION_HEADINGS,
   } as PublicConfig

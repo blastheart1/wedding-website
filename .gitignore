@@ -67,3 +67,7 @@ test-results/
 tmp/
 temp/
 wedding_luis_bee_floral_hero.html
+
+# ─── Design review / handoff artifacts (1.4 GB of previews, kept locally, never shipped) ───
+design-review/
+handoff/

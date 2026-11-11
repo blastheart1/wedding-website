@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { motion, useInView } from 'framer-motion'
+import {useWorldMotion} from '@/lib/site-motion'
 import { STORY_CHAPTERS } from '@/lib/constants'
 import { SectionHeader } from '@/components/ui/SectionHeader'
 import { SectionBackground } from '@/components/ui/SectionBackground'
@@ -17,15 +18,18 @@ interface StoryProps {
 }
 
 export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECTION_HEADINGS.story }: StoryProps) {
+  const {reduced}=useWorldMotion()
   const ref    = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-100px' })
   const [storyPhotos, setStoryPhotos] = useState<StoryPhotoData[]>([])
 
   useEffect(() => {
-    fetch('/api/story', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(j => setStoryPhotos(j.photos ?? []))
-      .catch(() => setStoryPhotos([]))
+    const controller = new AbortController()
+    fetch('/api/story', { cache: 'no-store', signal: controller.signal })
+      .then(res => { if (!res.ok) throw new Error('Photos unavailable'); return res.json() })
+      .then(data => { if (Array.isArray(data)) setStoryPhotos(data); else if (Array.isArray(data.photos)) setStoryPhotos(data.photos) })
+      .catch(() => { /* Keep the accessible empty-state when media is unavailable. */ })
+    return () => controller.abort()
   }, [])
 
   // Build a slot→photo map for quick lookup
@@ -33,7 +37,7 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECT
   storyPhotos.forEach(p => photoBySlot.set(p.slot, p))
 
   return (
-    <section id="story" className="relative py-24 px-6">
+    <section id="story" className="relative min-h-[100svh] py-28 px-6">
       <SectionBackground imageUrl={bgUrl} fallbackColor="bg-petal" />
 
       <div className="relative z-10">
@@ -41,7 +45,7 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECT
 
         <div
           ref={ref}
-          className="grid grid-cols-2 sm:grid-cols-3 gap-0 max-w-[860px] mx-auto justify-items-center"
+          className="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-12 max-w-[1120px] mx-auto justify-items-center"
           style={{ perspective: '1200px' }}
         >
           {chapters.map((chapter) => {
@@ -50,20 +54,20 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECT
             return (
               <motion.div
                 key={chapter.id}
-                initial={{ opacity: 0, y: 48, rotate: deg }}
-                animate={inView ? { opacity: 1, y: 0, rotate: deg } : {}}
-                whileHover={{ rotate: 0, y: -10, scale: 1.05, zIndex: 10 }}
+                initial={reduced?false:{ opacity: 0, y: 48, rotate: deg }}
+                animate={reduced||inView ? { opacity: 1, y: 0, rotate: deg } : {}}
+                whileHover={reduced?undefined:{ rotate: 0, y: -10, scale: 1.05, zIndex: 10 }}
                 transition={{
-                  duration: 0.7,
-                  delay: chapter.delay / 1000,
+                  duration: reduced?0:0.7,
+                  delay: reduced?0:chapter.delay / 1000,
                   ease: [0.34, 1.56, 0.64, 1],
                 }}
                 className={clsx(
                   'bg-white relative cursor-pointer',
                   'shadow-[0_4px_20px_rgba(46,31,26,0.09)]',
                   'hover:shadow-[0_20px_44px_rgba(46,31,26,0.13)]',
-                  'max-w-[200px] w-full',
-                  'p-3 pb-11',
+                  'max-w-[320px] w-full',
+                  'p-3 pb-12',
                 )}
               >
                 {/* Photo area — uploaded photo or emoji fallback */}
@@ -73,7 +77,7 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECT
                       src={photo.url}
                       alt={photo.caption ?? chapter.caption}
                       fill
-                      sizes="200px"
+                      sizes="(max-width:640px) 44vw, 320px"
                       className="object-cover"
                     />
                   </div>
@@ -84,12 +88,12 @@ export function Story({ bgUrl, chapters = STORY_CHAPTERS, heading = DEFAULT_SECT
                 )}
 
                 {/* Caption: photo caption takes priority over chapter default */}
-                <p className="font-display text-[12px] italic text-ink2 text-center leading-snug mt-2">
+                <p className="font-display text-[21px] italic text-ink2 text-center leading-snug mt-2">
                   {photo?.caption ?? chapter.caption}
                 </p>
 
                 {/* Date stamp */}
-                <span className="absolute bottom-[10px] right-3 text-[8px] tracking-[1.5px] text-muted">
+                <span className="absolute bottom-[10px] right-3 text-[14px] tracking-[1.5px] text-muted">
                   {chapter.stamp}
                 </span>
               </motion.div>

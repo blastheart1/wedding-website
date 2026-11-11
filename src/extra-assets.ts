@@ -1,0 +1,1 @@
+export const backgrounds={"storyBgUrl": "/wedding/scene-1.jpg", "countdownBgUrl": "/wedding/scene-2.jpg", "detailsBgUrl": "/wedding/scene-3.jpg"};export const arrowUp="/wedding/scene-4.svg";export const heroVideo="/wedding/scene-5.mp4";

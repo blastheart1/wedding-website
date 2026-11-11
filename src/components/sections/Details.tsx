@@ -1,159 +1,29 @@
 'use client'
-
-import { useRef } from 'react'
-import { motion, useInView } from 'framer-motion'
-import type { PublicConfig } from '@/lib/config'
-import { SectionHeader }           from '@/components/ui/SectionHeader'
-import { stagger, fadeUp }         from '@/lib/animations'
-import { SectionBackground }       from '@/components/ui/SectionBackground'
-import type { SectionHeading }     from '@/types'
-import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
-
-interface DetailsProps {
-  config: Pick<
-    PublicConfig,
-    | 'weddingDate' | 'ceremonyTime' | 'receptionTime'
-    | 'ceremonyVenue' | 'receptionVenue' | 'location'
-    | 'dressCode' | 'hotelName' | 'hotelCode' | 'hotelDiscount'
-    | 'guestNotes'
-  >
-  bgUrl?:   string
-  heading?: SectionHeading
-}
-
-function formatWeddingDate(dateStr: string): string {
-  try {
-    const [year, month, day] = dateStr.split('-').map(Number)
-    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
-      weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-    })
-  } catch {
-    return dateStr
-  }
-}
-
-function Line({ text }: { text: string }) {
-  if (!text || text === 'TBA') {
-    return <p className="text-muted italic">Details coming soon</p>
-  }
-  return <p>{text}</p>
-}
-
-export function Details({ config, bgUrl, heading = DEFAULT_SECTION_HEADINGS.details }: DetailsProps) {
-  const {
-    weddingDate, ceremonyTime, receptionTime,
-    ceremonyVenue, receptionVenue, location,
-    dressCode, hotelName, hotelCode, hotelDiscount, guestNotes,
-  } = config
-
-  const displayDate = formatWeddingDate(weddingDate)
-
-  const cards = [
-    {
-      icon:  '🌸',
-      label: 'Ceremony',
-      title: 'The Wedding',
-      bg:    'bg-petal',
-      lines: [
-        displayDate,
-        ceremonyTime,
-        '',
-        ceremonivenueLine(ceremonyVenue, location),
-        guestNotes || '',
-      ].filter(l => l !== undefined) as string[],
-    },
-    {
-      icon:  '🥂',
-      label: 'Reception',
-      title: 'Celebration',
-      bg:    'bg-peach',
-      lines: [
-        `Following the ceremony · ${receptionTime}`,
-        '',
-        receptionVenue !== 'TBA' ? receptionVenue : '',
-        'Dinner, dancing & toasts',
-      ],
-    },
-    {
-      icon:  '👗',
-      label: 'Attire',
-      title: 'Dress Code',
-      bg:    'bg-lavender',
-      lines: [
-        dressCode,
-      ],
-    },
-    {
-      icon:  '🏨',
-      label: 'Stay',
-      title: 'Accommodations',
-      bg:    'bg-sage',
-      lines: [
-        hotelName !== 'TBA' ? hotelName : '',
-        hotelCode ? `Promo code: ${hotelCode}` : '',
-        hotelDiscount ? `${hotelDiscount} off for our guests` : '',
-      ],
-    },
-  ]
-
-  const ref    = useRef(null)
-  const inView = useInView(ref, { once: true, margin: '-60px' })
-
-  return (
-    <section id="details" className="relative py-24 px-6">
-      <SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream" />
-      <div className="relative z-10">
-      <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
-
-      <motion.div
-        ref={ref}
-        className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-rule max-w-[820px] mx-auto border border-rule"
-        variants={stagger(0.1, 0)}
-        initial="hidden"
-        animate={inView ? 'visible' : 'hidden'}
-      >
-        {cards.map((card) => (
-          <motion.div
-            key={card.title}
-            variants={fadeUp}
-            className="bg-cream p-10 hover:bg-peach transition-colors duration-300 relative overflow-hidden group"
-          >
-            {/* Animated top accent line */}
-            <motion.div
-              className="absolute top-0 left-0 h-[3px] bg-rose"
-              initial={{ width: 0, opacity: 0 }}
-              animate={inView ? { width: '100%', opacity: 0.6 } : {}}
-              transition={{ duration: 0.9, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            />
-
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[15px] ${card.bg}`}>
-                {card.icon}
-              </div>
-              <div>
-                <p className="text-[9px] tracking-[3px] uppercase text-muted">{card.label}</p>
-                <h3 className="font-display text-[21px] font-normal text-ink">{card.title}</h3>
-              </div>
-            </div>
-
-            <div className="text-[13px] leading-[1.9] text-ink2">
-              {card.lines.map((line, i) =>
-                line === ''
-                  ? <br key={i} />
-                  : <Line key={i} text={line} />,
-              )}
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
-      </div>
-    </section>
-  )
-}
-
-function ceremonivenueLine(venue: string, location: string): string {
-  if (venue !== 'TBA' && location !== 'TBA') return `${venue} · ${location}`
-  if (venue !== 'TBA') return venue
-  if (location !== 'TBA') return location
-  return ''
+import {useState} from 'react'
+import {useWorldMotion} from '@/lib/site-motion'
+import {motion,AnimatePresence} from 'framer-motion'
+import type {PublicConfig} from '@/lib/config'
+import {SectionHeader} from '@/components/ui/SectionHeader'
+import {SectionBackground} from '@/components/ui/SectionBackground'
+import {dressCodeWarning} from '@/dress-code-assets'
+const pastels=[['Blush pink','#e9b8c4'],['Lilac','#c9b7e6'],['Sky blue','#a8cce3'],['Mint','#b7d5c4'],['Butter yellow','#f3df8d']]
+const brights=[['Fuchsia','#d65497'],['Lavender','#9470c2'],['Cornflower','#5c8dcc'],['Fresh green','#6fb47f'],['Sunshine','#efbd38']]
+const restricted=[['Black','#232323'],['White','#fff'],['Brown','#75503b'],['Beige','#c8b49b'],['Cream','#f3e7cc'],['Rust','#aa5d3d'],['Red','#c43242']]
+function Palette({colors,forbidden=false}:{colors:string[][],forbidden?:boolean}){return <ul className={`palette-row${forbidden?' palette-forbidden':''}`} aria-label={forbidden?'Colors not to wear':'Suggested outfit colors'}>{colors.map(([name,color])=><li key={name}><span className="fabric-swatch" style={{backgroundColor:color}} aria-hidden="true"/><span>{name}</span>{forbidden&&<span className="swatch-instruction">Do not wear</span>}</li>)}</ul>}
+export function Details({config,bgUrl}:{config:PublicConfig,bgUrl?:string}){
+ const {reduced}=useWorldMotion()
+ const {presentation}=config
+ const churchImages=presentation.ceremonyImages
+ const mapLink=presentation.ceremonyMapUrl
+ const heading=config.sectionHeadings.details
+ const [mapOpen,setMapOpen]=useState(false),[photo,setPhoto]=useState(0)
+ const selectedPhoto=churchImages[photo] ?? churchImages[0]
+ const ceremonyVenue=config.ceremonyVenue && config.ceremonyVenue !== 'TBA' ? config.ceremonyVenue : 'Nuestra Señora de la Annunciata Parish Church'
+ const date=new Date(`${config.weddingDate}T12:00:00`).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})
+ return <section id="details" className="wedding-details relative min-h-[100svh] py-28 px-6"><SectionBackground imageUrl={bgUrl} fallbackColor="bg-cream"/><div className="relative z-10 details-container"><SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic}/>
+ <motion.article className="ceremony-card" initial={reduced?false:{opacity:0,y:24}} animate={reduced?{opacity:1,y:0}:undefined} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:0.1}} transition={reduced?{duration:0}:{duration:0.7}}>{selectedPhoto&&<div className="church-photo"><img src={selectedPhoto.src} alt={selectedPhoto.alt} loading="lazy"/><div className="photo-selectors" aria-label="Church photographs">{churchImages.map((p,i)=><button type="button" key={p.label} aria-label={`View ${p.label}`} aria-pressed={photo===i} onClick={()=>setPhoto(i)}><img src={p.src} alt=""/><span>{p.label}</span></button>)}</div></div>}<div className="ceremony-copy"><p className="detail-kicker">The ceremony</p><h3 className="font-display">Where we say <em>“I do”</em></h3><p className="ceremony-date">{date}<br/><strong>{config.ceremonyTime}</strong><br/><span>Philippine Standard Time</span></p><a className="church-name" href={mapLink} target="_blank" rel="noopener">{ceremonyVenue}</a><p className="church-alias">{presentation.ceremonyAlias}</p><p className="church-address">{presentation.ceremonyAddress}</p>{mapLink&&<div className="ceremony-actions"><a className="wedding-button" href={mapLink} target="_blank" rel="noopener">Get directions</a><button className="text-link" type="button" aria-expanded={mapOpen} aria-controls="church-map" onClick={()=>setMapOpen(v=>!v)}>{mapOpen?'Hide map':'View map'}</button></div>}</div>
+ <AnimatePresence initial={false}>{mapOpen&&presentation.ceremonyMapEmbedUrl&&<motion.div id="church-map" className="church-map" initial={reduced?false:{height:0,opacity:0}} animate={{height:'auto',opacity:1}} exit={{height:0,opacity:0}} transition={reduced?{duration:0}:{duration:0.35,ease:[0.22,1,0.36,1]}}><iframe title={`Map for ${ceremonyVenue}`} src={presentation.ceremonyMapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade"/><p>For the exact church pin and route, <a href={mapLink} target="_blank" rel="noopener">open Google Maps</a>.</p></motion.div>}</AnimatePresence>
+ </motion.article>
+ <motion.article className="reception-note" initial={reduced?false:{opacity:0,y:18}} animate={reduced?{opacity:1,y:0}:undefined} whileInView={{opacity:1,y:0}} viewport={{once:true}} transition={reduced?{duration:0}:{duration:.6}}><p className="detail-kicker">The reception</p><h3 className="font-display">A little more <em>celebrating</em></h3><p>{config.receptionVenue && config.receptionVenue !== 'TBA' ? config.receptionVenue : 'Venue to be announced.'}</p>{config.receptionVenue && config.receptionVenue !== 'TBA' && <p>{config.receptionTime}</p>}<p>{presentation.receptionNote}</p></motion.article>
+ <motion.article className="dress-code-card" initial={reduced?false:{opacity:0,y:24}} animate={reduced?{opacity:1,y:0}:undefined} whileInView={{opacity:1,y:0}} viewport={{once:true,amount:.1}} transition={reduced?{duration:0}:{duration:.7}}><div className="dress-intro"><p className="detail-kicker">Dress code</p><h3 className="font-display">{config.dressCode}</h3><p className="whitespace-pre-line">{presentation.dressDescription}</p></div><div className="dress-palettes"><h4>Soft spring &amp; pastel</h4><Palette colors={pastels}/><h4>Or a brighter bloom</h4><Palette colors={brights}/><p className="palette-help">These shades are inspiration, not an exact color match.</p><div className="dress-avoid" role="note" aria-labelledby="dress-avoid-title"><h4 id="dress-avoid-title"><img src={dressCodeWarning} className="dress-warning-symbol" alt="" width="36" height="36"/>NOT ALLOWED TO WEAR</h4><p className="dress-avoid-instruction whitespace-pre-line">{presentation.dressRestrictions}</p><Palette colors={restricted} forbidden/><p className="dress-code-thanks">Please choose from our spring, pastel or bright palettes above. Thank you for respecting our wedding dress code.</p></div></div></motion.article>{config.guestNotes&&<article className="reception-note"><p className="detail-kicker">A note for our guests</p><p className="whitespace-pre-line">{config.guestNotes}</p></article>}{config.hotelName&&config.hotelName!=='TBA'&&<article className="reception-note"><p className="detail-kicker">Where to stay</p><h3 className="font-display">{config.hotelName}</h3><p>{config.hotelCode&&`Use code ${config.hotelCode}. `}{config.hotelDiscount&&`${config.hotelDiscount} discount.`}</p></article>}</div></section>
 }
