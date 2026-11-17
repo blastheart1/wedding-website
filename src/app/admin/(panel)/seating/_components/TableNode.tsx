@@ -4,7 +4,7 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import clsx from 'clsx'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { RotateCw } from 'lucide-react'
-import { CHAIR, chairPoints, clamp, rotatePoint, snap, tableBox, tableReach } from '@/lib/seating/geometry'
+import { CHAIR, FLOOR, chairPoints, clamp, rotatePoint, snap, tableBox } from '@/lib/seating/geometry'
 import { ATTENDANCE_LABEL, personKey, type Person } from '@/lib/seating/people'
 import { settleRotation, type Assignment, type SeatingTable } from '@/lib/seating/rules'
 import { dragId } from './api'
@@ -74,7 +74,6 @@ interface TableNodeProps {
   table: SeatingTable
   seated: readonly Assignment[]
   peopleByKey: ReadonlyMap<string, Person>
-  room: { width: number; height: number }
   /** Locked: tables cannot be moved or turned, only seated at. */
   locked: boolean
   zoom: number
@@ -93,7 +92,7 @@ const HANDLE_GAP = 26
  * drag the round handle to turn it, click it to open it. Drawn with plain
  * elements so it scales with the floor.
  */
-export function TableNode({ table, seated, peopleByKey, room, locked, zoom, selectedKey, onSelectPerson, onSeat, onOpen, onMoved, onTurned }: TableNodeProps) {
+export function TableNode({ table, seated, peopleByKey, locked, zoom, selectedKey, onSelectPerson, onSeat, onOpen, onMoved, onTurned }: TableNodeProps) {
   const [offset, setOffset] = useState<{ x: number; y: number } | null>(null)
   const [turning, setTurning] = useState<number | null>(null)
   const anchor = useRef<HTMLDivElement>(null)
@@ -102,9 +101,7 @@ export function TableNode({ table, seated, peopleByKey, room, locked, zoom, sele
   const box = tableBox(table.shape, table.chairs)
   const points = chairPoints(table.shape, table.chairs, rotation)
   const byChair = new Map(seated.map(assignment => [assignment.chair, assignment]))
-  // A table and its chairs always stay inside the room.
-  const reach = Math.min(tableReach(table.shape, table.chairs), Math.floor(Math.min(room.width, room.height) / 2))
-  const place = (dx: number, dy: number) => ({ x: clamp(snap(table.x + dx), reach, room.width - reach), y: clamp(snap(table.y + dy), reach, room.height - reach) })
+  const place = (dx: number, dy: number) => ({ x: clamp(snap(table.x + dx), -FLOOR.limit, FLOOR.limit), y: clamp(snap(table.y + dy), -FLOOR.limit, FLOOR.limit) })
   const position = offset ? place(offset.x, offset.y) : { x: table.x, y: table.y }
   const activate = () => { if (selectedKey) onSeat(table.id); else onOpen(table.id) }
 

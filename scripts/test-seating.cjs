@@ -226,13 +226,32 @@ test('geometry: chairs sit outside the table top, and a couple\'s table has them
   assert.equal(long.filter(point => point.y > 0).length, 3)
 })
 
-test('geometry: turning a table moves its chairs around the centre without changing their distance', () => {
-  const flat = geometry.chairPoints('rect', 6, 0)
-  const turned = geometry.chairPoints('rect', 6, 90)
+test('geometry: turning a table carries its chairs round, and a name never runs over the table top at any angle', () => {
+  // A quarter turn puts each chair a quarter turn round, a little further out to make room for its level name.
+  const flat = geometry.chairPoints('rect', 6, 0), turned = geometry.chairPoints('rect', 6, 90)
+  const extra = (geometry.CHAIR.width - geometry.CHAIR.height) / 2
   flat.forEach((point, index) => {
-    assert.ok(Math.abs(Math.hypot(point.x, point.y) - Math.hypot(turned[index].x, turned[index].y)) < 0.2)
-    assert.ok(Math.abs(turned[index].x - -point.y) < 0.2 && Math.abs(turned[index].y - point.x) < 0.2)
+    assert.ok(Math.abs(turned[index].y - point.x) < 0.2)
+    assert.ok(Math.abs(Math.abs(turned[index].x) - (Math.abs(point.y) + extra)) < 0.2)
   })
+  // Round tables look the same from every side: the chairs simply go round.
+  const ring = geometry.chairPoints('round', 8, 0), spun = geometry.chairPoints('round', 8, 37)
+  ring.forEach((point, index) => assert.ok(Math.abs(Math.hypot(point.x, point.y) - Math.hypot(spun[index].x, spun[index].y)) < 0.2))
+  for (const shape of ['rect', 'square', 'couple']) {
+    for (const chairs of [2, 7, 12]) {
+      const box = geometry.tableBox(shape, chairs)
+      for (let rotation = 0; rotation < 360; rotation += 15) {
+        for (const point of geometry.chairPoints(shape, chairs, rotation)) {
+          // The four corners of the level name pill, turned back into the table's own frame, all lie outside the top.
+          for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+            const corner = geometry.rotatePoint({ x: point.x + (dx * geometry.CHAIR.width) / 2, y: point.y + (dy * geometry.CHAIR.height) / 2 }, -rotation)
+            assert.ok(Math.abs(corner.x) >= box.width / 2 - 0.5 || Math.abs(corner.y) >= box.height / 2 - 0.5, `${shape} ${chairs} at ${rotation}°`)
+          }
+          assert.ok(Math.hypot(point.x, point.y) + geometry.CHAIR.width / 2 <= geometry.tableReach(shape, chairs) + 1, `${shape} ${chairs} reach at ${rotation}°`)
+        }
+      }
+    }
+  }
   assert.equal(geometry.snap(123), 120)
   assert.equal(geometry.clamp(-5, 0, 10), 0)
 })
@@ -247,9 +266,10 @@ test('rules: tables turn freely to any whole degree, and settle on a straight an
   assert.equal(rules.settleRotation(358), 0)
   assert.equal(rules.settleRotation(-3), 0)
   assert.equal(rules.settleRotation(52), 52)
-  // A freely turned table still keeps its chairs apart and at the same distance.
+  // A freely turned table keeps every chair, none of them closer in than before.
   const flat = geometry.chairPoints('rect', 8, 0), turned = geometry.chairPoints('rect', 8, 37)
-  flat.forEach((point, index) => assert.ok(Math.abs(Math.hypot(point.x, point.y) - Math.hypot(turned[index].x, turned[index].y)) < 0.2))
+  assert.equal(turned.length, 8)
+  flat.forEach((point, index) => assert.ok(Math.hypot(turned[index].x, turned[index].y) >= Math.hypot(point.x, point.y) - 0.2))
 })
 
 // ─── Seating by typing a name ─────────────────────────────────────────────────
@@ -279,12 +299,38 @@ test('suggest: a comma or a new line finishes a name; the rest is still being ty
   assert.deepEqual(plain(suggest.splitNames(',, ,')), { finished: [], typing: '' })
 })
 
+test('geometry: the floor is open in every direction, and the view can centre on what is on it', () => {
+  assert.equal(schemas.tableUpdateSchema.safeParse({ id: 1, x: -750, y: -1200 }).success, true)
+  assert.equal(geometry.contentBounds([], []), null)
+  const bounds = geometry.contentBounds([{ shape: 'round', chairs: 10, x: 0, y: 0 }, { shape: 'round', chairs: 10, x: 1000, y: 400 }], [{ x: 500, y: -300, width: 200, height: 100 }])
+  const reach = geometry.tableReach('round', 10)
+  assert.deepEqual(plain(bounds), { left: -reach, top: -350, right: 1000 + reach, bottom: 400 + reach })
+  const frame = { width: 1200, height: 700 }, limits = { min: 0.05, max: 1 }
+  const view = geometry.viewToFit(bounds, frame, limits)
+  // The middle of the content lands in the middle of the frame, and all of it is inside.
+  const onScreen = (x, y) => ({ x: x * view.zoom + view.x, y: y * view.zoom + view.y })
+  const middle = onScreen((bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2)
+  assert.ok(Math.abs(middle.x - 600) < 0.001 && Math.abs(middle.y - 350) < 0.001)
+  const a = onScreen(bounds.left, bounds.top), b = onScreen(bounds.right, bounds.bottom)
+  assert.ok(a.x >= 47 && a.y >= 47 && b.x <= 1153 && b.y <= 653)
+  // A small plan is not blown up past full size; an empty floor opens at full size.
+  assert.equal(geometry.viewToFit({ left: 0, top: 0, right: 100, bottom: 100 }, frame, limits).zoom, 1)
+  assert.equal(geometry.viewToFit(null, frame, limits).zoom, 1)
+  // A huge plan zooms out as far as it needs, down to the limit.
+  assert.equal(geometry.viewToFit({ left: -20000, top: -20000, right: 20000, bottom: 20000 }, frame, limits).zoom, 0.05)
+  // Zooming about a point keeps that point still.
+  const before = { x: 30, y: -40, zoom: 0.5 }, point = { x: 400, y: 300 }
+  const after = geometry.zoomAbout(before, 1.25, point)
+  assert.ok(Math.abs((point.x - before.x) / before.zoom - (point.x - after.x) / after.zoom) < 1e-9)
+  assert.ok(Math.abs((point.y - before.y) / before.zoom - (point.y - after.y) / after.zoom) < 1e-9)
+})
+
 // ─── Input checks ─────────────────────────────────────────────────────────────
 test('schemas: a table needs sensible values', () => {
   assert.deepEqual(plain(schemas.tableCreateSchema.parse({ x: 100, y: 200 })), { shape: 'round', chairs: 10, x: 100, y: 200, rotation: 0 })
   assert.equal(schemas.tableCreateSchema.parse({ label: '  Family  ', shape: 'couple', chairs: 2, x: 0, y: 0, rotation: 90 }).label, 'Family')
   const bad = [
-    { x: 1, y: 1, chairs: 0 }, { x: 1, y: 1, chairs: 25 }, { x: 1, y: 1, chairs: 2.5 }, { x: 1, y: 1, shape: 'oval' }, { x: -1, y: 1 }, { x: 1, y: 99999 },
+    { x: 1, y: 1, chairs: 0 }, { x: 1, y: 1, chairs: 25 }, { x: 1, y: 1, chairs: 2.5 }, { x: 1, y: 1, shape: 'oval' }, { x: -20001, y: 1 }, { x: 1, y: 99999 },
     { x: 1, y: 1, rotation: 10.5 }, { x: 1, y: 1, rotation: -1 }, { x: 1, y: 1, rotation: 360 }, { x: 1, y: 1, label: '' }, { x: 1, y: 1, label: 'x'.repeat(41) }, { x: '1', y: 1 }, {},
   ]
   for (const input of bad) assert.equal(schemas.tableCreateSchema.safeParse(input).success, false, JSON.stringify(input))

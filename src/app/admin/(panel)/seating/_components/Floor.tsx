@@ -1,10 +1,11 @@
 'use client'
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { Maximize, ZoomIn, ZoomOut } from 'lucide-react'
-import { FLOOR } from '@/lib/seating/geometry'
+import { Focus, ZoomIn, ZoomOut } from 'lucide-react'
+import { FLOOR, clamp, zoomAbout, type FloorView } from '@/lib/seating/geometry'
 
-export const ZOOM = { min: 0.3, max: 1.6, step: 0.15 } as const
+/** Far enough out to see a whole venue and its grounds; close enough in to read every name. */
+export const ZOOM = { min: 0.05, max: 2, step: 1.25 } as const
 
 /** Where an empty spot of the floor was clicked: in floor units, and in pixels from the floor's top left corner. */
 export interface FloorSpot {
@@ -14,14 +15,19 @@ export interface FloorSpot {
   top: number
 }
 
+export interface FloorHandle {
+  /** The size of the floor on screen, in pixels. */
+  frame: () => { width: number; height: number }
+}
+
 interface FloorProps {
-  room: { width: number; height: number }
-  zoom: number
-  onZoom: (zoom: number) => void
-  onFit: () => void
+  view: FloorView
+  onView: (view: FloorView) => void
+  /** Centres the view on everything on the floor. */
+  onCentre: () => void
   /** A click on empty floor (not the end of a drag). */
   onBlankClick: (spot: FloorSpot) => void
-  /** Drawn over the floor without scrolling or zooming with it: the add menu. */
+  /** Drawn over the floor without moving or zooming with it: the add menu, the empty message. */
   overlay?: ReactNode
   children: ReactNode
 }
@@ -38,90 +44,96 @@ function ZoomButton({ label, onClick, disabled, children }: { label: string; onC
 const PAN_START_PX = 4
 
 /**
- * The room. Drag empty floor to move around it, scroll or use the buttons to
- * zoom, click empty floor to add something there. Everything inside is
- * positioned in floor units and scaled as one layer.
+ * An open floor with no edges: drag empty floor to move across it, scroll to
+ * move, pinch or Ctrl/Cmd + wheel to zoom about the pointer, click empty floor
+ * to add something there. Everything on it is positioned in floor units
+ * (one unit is one centimetre) and drawn as one layer.
  */
-export const Floor = forwardRef<HTMLDivElement, FloorProps>(function Floor({ room, zoom, onZoom, onFit, onBlankClick, overlay, children }, ref) {
-  const scroller = useRef<HTMLDivElement>(null)
-  useImperativeHandle(ref, () => scroller.current as HTMLDivElement)
-  const pan = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null)
-  const zoomNow = useRef(zoom)
-  zoomNow.current = zoom
-  const grid = FLOOR.grid * 5
+export const Floor = forwardRef<FloorHandle, FloorProps>(function Floor({ view, onView, onCentre, onBlankClick, overlay, children }, ref) {
+  const frame = useRef<HTMLDivElement>(null)
+  const pan = useRef<{ x: number; y: number; viewX: number; viewY: number; moved: boolean } | null>(null)
+  const latest = useRef(view)
+  latest.current = view
+  useImperativeHandle(ref, () => ({ frame: () => ({ width: frame.current?.clientWidth ?? 0, height: frame.current?.clientHeight ?? 0 }) }))
 
-  // Pinch on a trackpad, or Ctrl/Cmd with the wheel, zooms instead of scrolling the page.
+  const zoomTo = (zoom: number, point?: { x: number; y: number }) => {
+    const box = frame.current
+    const centre = point ?? { x: (box?.clientWidth ?? 0) / 2, y: (box?.clientHeight ?? 0) / 2 }
+    onView(zoomAbout(latest.current, clamp(zoom, ZOOM.min, ZOOM.max), centre))
+  }
+
+  // The wheel moves across the floor; with Ctrl/Cmd (or a trackpad pinch) it zooms about the pointer.
   useEffect(() => {
-    const box = scroller.current
+    const box = frame.current
     if (!box) return
     const onWheel = (event: WheelEvent) => {
-      if (!event.ctrlKey && !event.metaKey) return
       event.preventDefault()
-      onZoom(zoomNow.current * (event.deltaY < 0 ? 1.08 : 1 / 1.08))
+      const current = latest.current
+      if (event.ctrlKey || event.metaKey) {
+        const rect = box.getBoundingClientRect()
+        const zoom = clamp(current.zoom * Math.exp(-event.deltaY * 0.01), ZOOM.min, ZOOM.max)
+        onView(zoomAbout(current, zoom, { x: event.clientX - rect.left, y: event.clientY - rect.top }))
+      } else {
+        onView({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY })
+      }
     }
     box.addEventListener('wheel', onWheel, { passive: false })
     return () => box.removeEventListener('wheel', onWheel)
-  }, [onZoom])
+  }, [onView])
 
-  const onBlank = (event: ReactPointerEvent) => !(event.target as HTMLElement).closest('[data-floor-item]')
+  const isBlank = (target: EventTarget) => !(target as HTMLElement).closest('[data-floor-item]')
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const box = scroller.current
-    // A finger already scrolls the floor natively; this is for the mouse.
-    if (!box || event.pointerType !== 'mouse' || event.button !== 0 || !onBlank(event)) return
-    pan.current = { x: event.clientX, y: event.clientY, left: box.scrollLeft, top: box.scrollTop, moved: false }
+    if ((event.pointerType === 'mouse' && event.button !== 0) || !isBlank(event.target)) return
+    pan.current = { x: event.clientX, y: event.clientY, viewX: latest.current.x, viewY: latest.current.y, moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const start = pan.current, box = scroller.current
-    if (!start || !box) return
+    const start = pan.current
+    if (!start) return
     const dx = event.clientX - start.x, dy = event.clientY - start.y
     if (!start.moved && Math.hypot(dx, dy) < PAN_START_PX) return
     start.moved = true
-    box.scrollLeft = start.left - dx
-    box.scrollTop = start.top - dy
+    onView({ ...latest.current, x: start.viewX + dx, y: start.viewY + dy })
   }
+  // Cleared after the click that ends the drag has been seen, so a drag never counts as a click.
   const onPointerUp = () => { window.setTimeout(() => { pan.current = null }, 0) }
   const onClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const box = scroller.current
-    if (!box || pan.current?.moved || (event.target as HTMLElement).closest('[data-floor-item]')) return
-    const layer = event.currentTarget.getBoundingClientRect(), frame = box.getBoundingClientRect()
-    onBlankClick({
-      x: (event.clientX - layer.left) / zoomNow.current,
-      y: (event.clientY - layer.top) / zoomNow.current,
-      left: event.clientX - frame.left,
-      top: event.clientY - frame.top,
-    })
+    const box = frame.current
+    if (!box || pan.current?.moved || !isBlank(event.target)) return
+    const rect = box.getBoundingClientRect(), current = latest.current
+    const left = event.clientX - rect.left, top = event.clientY - rect.top
+    onBlankClick({ x: (left - current.x) / current.zoom, y: (top - current.y) / current.zoom, left, top })
   }
 
+  // Grid lines every half metre, with a heavier line every metre once zoomed in enough to tell them apart.
+  const cell = FLOOR.grid * 5 * view.zoom
+  const fine = cell >= 8
+  const size = fine ? cell : cell * 4
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-xl bg-[#B4B6C1] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]">
-      <div ref={scroller} className="h-full overflow-auto overscroll-contain" data-seating-floor="true">
-        {/* Centred when the whole room fits; scrolls from the top left when it does not. */}
-        <div className="mx-auto" style={{ width: room.width * zoom, height: room.height * zoom }}>
-          <div
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onClick={onClick}
-            data-seating-room="true"
-            className="relative origin-top-left cursor-grab bg-[#DFE0E7] active:cursor-grabbing"
-            style={{
-              width: room.width, height: room.height, transform: `scale(${zoom})`,
-              backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.09) 1px, transparent 1px)',
-              backgroundSize: `${grid}px ${grid}px`,
-            }}
-          >
-            {children}
-          </div>
-        </div>
+    <div
+      ref={frame}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onClick={onClick}
+      data-seating-floor="true"
+      className="relative h-full min-h-0 cursor-grab touch-none overflow-hidden rounded-xl bg-[#D3D5DD] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.14)] active:cursor-grabbing"
+      style={{
+        backgroundImage: 'linear-gradient(to right, rgba(0,0,0,0.085) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.085) 1px, transparent 1px)',
+        backgroundSize: `${size}px ${size}px`,
+        backgroundPosition: `${view.x}px ${view.y}px`,
+      }}
+    >
+      <div className="absolute left-0 top-0 h-0 w-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }} data-seating-layer="true">
+        {children}
       </div>
       {overlay}
-      <div className="absolute bottom-3 right-3 flex items-center overflow-hidden rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.28)]">
-        <ZoomButton label="Zoom out" onClick={() => onZoom(zoom - ZOOM.step)} disabled={zoom <= ZOOM.min}><ZoomOut size={18} aria-hidden="true" /></ZoomButton>
-        <span className="w-11 text-center text-[12px] font-medium tabular-nums text-black/70" aria-live="off">{Math.round(zoom * 100)}%</span>
-        <ZoomButton label="Zoom in" onClick={() => onZoom(zoom + ZOOM.step)} disabled={zoom >= ZOOM.max}><ZoomIn size={18} aria-hidden="true" /></ZoomButton>
-        <ZoomButton label="Fit the whole room" onClick={onFit}><Maximize size={17} aria-hidden="true" /></ZoomButton>
+      <div data-floor-item="true" className="absolute bottom-3 right-3 flex cursor-default items-center overflow-hidden rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.28)]">
+        <ZoomButton label="Zoom out" onClick={() => zoomTo(view.zoom / ZOOM.step)} disabled={view.zoom <= ZOOM.min}><ZoomOut size={18} aria-hidden="true" /></ZoomButton>
+        <span className="w-11 text-center text-[12px] font-medium tabular-nums text-black/70" aria-live="off">{Math.round(view.zoom * 100)}%</span>
+        <ZoomButton label="Zoom in" onClick={() => zoomTo(view.zoom * ZOOM.step)} disabled={view.zoom >= ZOOM.max}><ZoomIn size={18} aria-hidden="true" /></ZoomButton>
+        <ZoomButton label="Centre on the tables" onClick={onCentre}><Focus size={17} aria-hidden="true" /></ZoomButton>
       </div>
     </div>
   )
