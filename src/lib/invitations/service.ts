@@ -49,11 +49,22 @@ export function toInviteView(invitation: InvitationRecord, rsvp: RsvpRecord | nu
   }
 }
 
+/** The seat plan is an extra: if it cannot be read for any reason the invitation still works without it. */
+async function withSeating(store: InviteStore, invitation: InvitationRecord, rsvp: RsvpRecord | null, view: InviteView): Promise<InviteView> {
+  if (!store.findSeating) return view
+  try {
+    const seating = await store.findSeating(invitation, rsvp)
+    return seating ? { ...view, seating } : view
+  } catch {
+    return view
+  }
+}
+
 export async function loadInviteView(store: InviteStore, token: unknown, now: Date = new Date()): Promise<InviteView | null> {
   const invitation = await resolveInvitation(store, token)
   if (!invitation) return null
   const [rsvp, deadline] = await Promise.all([store.findRsvp(invitation), store.deadlineText()])
-  return toInviteView(invitation, rsvp, deadline, now.getTime())
+  return withSeating(store, invitation, rsvp, toInviteView(invitation, rsvp, deadline, now.getTime()))
 }
 
 /** Create or edit the RSVP behind a personal link. Every rule is rechecked here on each call. */
@@ -80,7 +91,9 @@ export async function submitInviteRsvp(store: InviteStore, token: unknown, paylo
     JSON.stringify({ attending: checked.values.attending, partySize: checked.values.partySize }))
 
   const saved = await store.findRsvp(invitation)
-  return { status: 200, body: { success: true, data: toInviteView(invitation, saved, deadline, now.getTime()) } }
+  // The answer just given decides what the guest sees of the seat plan (a guest who declines sees none).
+  const view = await withSeating(store, invitation, saved, toInviteView(invitation, saved, deadline, now.getTime()))
+  return { status: 200, body: { success: true, data: view } }
 }
 
 /** Called by the guest page after it loads in a real browser. Always answers the same way. */

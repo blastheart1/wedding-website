@@ -109,6 +109,47 @@ export const rateLimits = pgTable('rate_limits', {
   count:       integer('count').notNull().default(0),
 })
 
+// ─── Seat plan ────────────────────────────────────────────────────────────────
+export const seatingTables = pgTable('seating_tables', {
+  id:        serial('id').primaryKey(),
+  label:     varchar('label', { length: 60 }).notNull(),
+  // 'round' | 'rect' | 'square' | 'couple'
+  shape:     varchar('shape', { length: 20 }).notNull().default('round'),
+  chairs:    integer('chairs').notNull().default(10),
+  // Centre of the table on the floor, in floor units
+  x:         integer('x').notNull().default(0),
+  y:         integer('y').notNull().default(0),
+  rotation:  integer('rotation').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const seatingAssignments = pgTable(
+  'seating_assignments',
+  {
+    id:           serial('id').primaryKey(),
+    invitationId: integer('invitation_id').notNull().references(() => invitations.id, { onDelete: 'cascade' }),
+    // 0 = the invited guest, 1 and up = their plus ones
+    personIndex:  integer('person_index').notNull().default(0),
+    tableId:      integer('table_id').notNull().references(() => seatingTables.id, { onDelete: 'cascade' }),
+    // 0-based chair at the table
+    chair:        integer('chair').notNull(),
+    createdAt:    timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => ({
+    // A person sits in one place only, and a chair holds one person
+    personUnique: uniqueIndex('seating_assignments_person_unique').on(table.invitationId, table.personIndex),
+    chairUnique:  uniqueIndex('seating_assignments_chair_unique').on(table.tableId, table.chair),
+  }),
+)
+
+// Single row of validated JSON: published flag, room size, labelled floor shapes
+export const seatingPlan = pgTable('seating_plan', {
+  id:        serial('id').primaryKey(),
+  data:      text('data').notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
 // ─── FAQ Items ────────────────────────────────────────────────────────────────
 export const faqItems = pgTable('faq_items', {
   id:        serial('id').primaryKey(),

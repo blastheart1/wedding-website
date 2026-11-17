@@ -196,12 +196,12 @@ test('settings: defaults are valid and stored JSON is validated, not trusted', (
 // ─── Migration runner (offline only) ──────────────────────────────────────────
 const runMigrate = (...args) => spawnSync(process.execPath, [path.join(root, 'scripts/migrate.cjs'), ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, DATABASE_URL: '' } })
 
-test('migration: offline plan lists both files in order and applies nothing', () => {
+test('migration: offline plan lists every file in order and applies nothing', () => {
   const result = runMigrate('--plan')
   assert.equal(result.status, 0, result.stderr)
   const plan = JSON.parse(result.stdout)
   assert.equal(plan.applied, false)
-  assert.deepEqual(plan.migrations.map(item => item.file), ['migrations/20261111_site_presentation.sql', 'migrations/20261112_invitations.sql'])
+  assert.deepEqual(plan.migrations.map(item => item.file), ['migrations/20261111_site_presentation.sql', 'migrations/20261112_invitations.sql', 'migrations/20261113_seating.sql'])
   const statements = plan.migrations[1].statements
   assert.ok(statements.every(sql => /^(CREATE (TABLE|UNIQUE INDEX|INDEX) IF NOT EXISTS |ALTER TABLE rsvps (ADD COLUMN IF NOT EXISTS |ALTER COLUMN email DROP NOT NULL))/.test(sql)), 'only idempotent additive statements')
   assert.ok(!statements.some(sql => /\b(DROP TABLE|DROP COLUMN|DELETE FROM|UPDATE [a-z_]+ SET|TRUNCATE|INSERT INTO)\b/i.test(sql)))

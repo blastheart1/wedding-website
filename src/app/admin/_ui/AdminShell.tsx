@@ -9,6 +9,7 @@ import { SYSTEM_FONT } from './primitives'
 export const ADMIN_AREAS: readonly { href: string; label: string }[] = [
   { href: '/admin/invitations', label: 'Invitations' },
   { href: '/admin/rsvps', label: 'RSVPs' },
+  { href: '/admin/seating', label: 'Seat plan' },
   { href: '/admin/settings', label: 'Site settings' },
   { href: '/admin/gallery', label: 'Gallery' },
   { href: '/admin/story', label: 'Story' },
@@ -75,7 +76,8 @@ export function AdminShell({ partner1, partner2, children }: AdminShellProps) {
       </div>
 
       <main className="min-w-0 flex-1">
-        <div className="mx-auto w-full max-w-[980px] px-4 pb-24 pt-6 md:px-10 md:pt-10">{children}</div>
+        {/* The seat plan is a floor to work on, so it gets the room the other areas do not need. */}
+        <div className={clsx('mx-auto w-full px-4 pb-24 pt-6 md:px-10 md:pt-10', isActive('/admin/seating') ? 'max-w-[1500px]' : 'max-w-[980px]')}>{children}</div>
       </main>
     </div>
   )

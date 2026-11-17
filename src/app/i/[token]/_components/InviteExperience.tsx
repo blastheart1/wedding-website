@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { InviteView } from '@/lib/invitations/types'
 import { Group, Row, QuietButton } from './ui'
 import { RsvpForm } from './RsvpForm'
+import { YourTable } from './YourTable'
 
 export interface InviteExperienceProps {
   token: string
@@ -74,6 +75,8 @@ export function InviteExperience({ token, initialView, couple, dos, donts, ackno
           We would love to celebrate with you on {couple.date}.<br />{seatsLine(view)}
         </p>
       </header>
+
+      {view.seating && <YourTable seating={view.seating} />}
 
       {(dos.length > 0 || donts.length > 0) && (
         <>

@@ -1,4 +1,5 @@
 import type { InviteRsvpValues } from './policy'
+import type { GuestSeating } from '@/lib/seating/guest-view'
 
 /** The invitation fields the guest flow needs. Never includes the token or its hash. */
 export interface InvitationRecord {
@@ -34,6 +35,8 @@ export interface InviteStore {
   recordOpen(invitationId: number, now: Date): Promise<void>
   recordEvent(invitationId: number, type: InviteEventType, channel?: string | null, meta?: string | null): Promise<void>
   deadlineText(): Promise<string | null>
+  /** The guest's table once the seat plan is published. Optional so the RSVP rules can be tested without it. */
+  findSeating?(invitation: InvitationRecord, rsvp: RsvpRecord | null): Promise<GuestSeating | null>
 }
 
 export type InviteEventType =
@@ -58,6 +61,8 @@ export interface InviteView {
     message: string
     submittedAt: string
   } | null
+  /** Present only when the couple has published the seat plan and this guest is seated. */
+  seating?: GuestSeating | null
 }
 
 export interface ServiceResult<T> {
