@@ -25,6 +25,10 @@ export function Venue3D({ room, tables, assignments, shapes }: Venue3DProps) {
   const latest = useRef({ room, tables, assignments, shapes })
   latest.current = { room, tables, assignments, shapes }
   const [unavailable, setUnavailable] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [labels, setLabels] = useState(true)
+  const labelsRef = useRef(labels)
+  labelsRef.current = labels
 
   useEffect(() => {
     const target = canvas.current
@@ -32,10 +36,14 @@ export function Venue3D({ room, tables, assignments, shapes }: Venue3DProps) {
     let disposed = false
     let observer: ResizeObserver | null = null
     import('@/world/venue/venue-scene')
-      .then(({ createVenueScene }) => {
-        if (disposed) return
-        const created = createVenueScene(target, latest.current)
+      .then(({ createVenueScene }) => createVenueScene(target, latest.current))
+      .then(created => {
+        if (disposed) { created.dispose(); return }
         scene.current = created
+        // The plan may have changed while the models were on their way.
+        created.update(latest.current)
+        created.showLabels(labelsRef.current)
+        setReady(true)
         const fit = () => { const box = target.getBoundingClientRect(); created.resize(Math.max(1, box.width), Math.max(1, box.height)) }
         observer = new ResizeObserver(fit)
         observer.observe(target)
@@ -59,6 +67,7 @@ export function Venue3D({ room, tables, assignments, shapes }: Venue3DProps) {
   return (
     <div className="relative h-full min-h-0 overflow-hidden rounded-xl bg-[#DBE8EE]">
       <canvas ref={canvas} className="block h-full w-full cursor-grab touch-none active:cursor-grabbing" aria-label="The reception hall in 3D with the tables from the plan" />
+      {!ready && <p className="absolute inset-0 flex items-center justify-center text-[15px] text-black/55" role="status">Dressing the hall…</p>}
       <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
         {VIEWS.map(view => (
           <button key={view.value} type="button" onClick={() => scene.current?.lookFrom(view.value)}
@@ -66,6 +75,10 @@ export function Venue3D({ room, tables, assignments, shapes }: Venue3DProps) {
             {view.label}
           </button>
         ))}
+        <button type="button" aria-pressed={labels} onClick={() => { setLabels(!labels); scene.current?.showLabels(!labels) }}
+          className="rounded-full bg-white px-3.5 py-2 text-[13px] font-medium text-black/80 shadow-[0_1px_6px_rgba(0,0,0,0.25)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-black/60">
+          {labels ? 'Hide table names' : 'Show table names'}
+        </button>
       </div>
       <p className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/85 px-3 py-1.5 text-[12px] text-black/65">
         {(room.width / 100).toFixed(1)} × {(room.height / 100).toFixed(1)} m · sizes estimated from the venue video

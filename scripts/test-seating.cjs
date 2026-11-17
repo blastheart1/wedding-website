@@ -500,6 +500,31 @@ test('migration: the seating file only creates new tables and indexes, and match
   for (const name of declared) assert.match(sql, new RegExp('\\b' + name + '\\b'), name)
 })
 
+// ─── The 3D hall ──────────────────────────────────────────────────────────────
+test('3D hall: real models and scans are shipped small, and fetched only when the hall is opened', () => {
+  const folder = path.join(root, 'public/wedding/venue')
+  const files = fs.readdirSync(folder)
+  for (const model of ['chair', 'round-table', 'long-cloth', 'place-setting', 'wine-glass', 'flowers', 'aircon', 'chandelier', 'wall-lantern', 'fire-extinguisher', 'potted-plant', 'fern', 'shrub']) {
+    assert.ok(files.includes(model + '.glb'), model)
+  }
+  for (const surface of ['floor', 'wall', 'roof', 'drive']) for (const map of ['diff', 'nor', 'rough']) assert.ok(files.includes(`${surface}_${map}.webp`), `${surface} ${map}`)
+  assert.ok(files.includes('sky.hdr') && files.filter(file => file.startsWith('tree-')).length >= 4)
+  const total = files.reduce((sum, file) => sum + fs.statSync(path.join(folder, file)).size, 0)
+  assert.ok(total < 7 * 1024 * 1024, `venue assets are ${(total / 1048576).toFixed(1)} MB`)
+  // Nothing outside the 3D hall mentions them, and the hall itself is loaded on demand.
+  assert.match(read('src/app/admin/(panel)/seating/_components/SeatingView.tsx'), /dynamic\(\(\) => import\('\.\/Venue3D'\)/)
+  assert.match(read('src/app/admin/(panel)/seating/_components/Venue3D.tsx'), /import\('@\/world\/venue\/venue-scene'\)/)
+  assert.ok(!read('src/lib/loading/assets.ts').includes('venue'), 'not part of the public site\'s first load')
+})
+
+test('3D hall: every chair faces its table, with its place setting between the sitter and the centre', () => {
+  const source = read('src/world/venue/furniture.ts')
+  // The chair is turned so its back (+z) points away from the table, and is set outside the edge; the setting inside it.
+  assert.match(source, /chair: out\.clone\(\)\.multiplyScalar\(halfWidth \+ CHAIR_OUT\), setting: out\.clone\(\)\.multiplyScalar\(halfWidth - SETTING_IN\), turn: angle/)
+  assert.match(source, /placed\(assets\.models\.chair, \{ height: 0\.92, turn: Math\.PI \}\)/)
+  assert.match(source, /turn: side > 0 \? 0 : Math\.PI/)
+})
+
 // ─── Privacy and safety of the code paths ─────────────────────────────────────
 test('guest path: seating is read through the personal link only, and the public lookup knows nothing of it', () => {
   for (const file of ['src/lib/invitations/lookup.ts', 'src/lib/invitations/lookup-store.ts', 'src/app/api/invite/lookup/route.ts', 'src/lib/invitations/status-copy.ts']) {
