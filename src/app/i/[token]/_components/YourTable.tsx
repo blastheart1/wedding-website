@@ -5,7 +5,9 @@ import { Group, Row } from './ui'
 
 type Map = GuestSeating['map']
 
-const PADDING = 40
+const PADDING = 60
+/** Space between a table and the name under it, in floor units. */
+const LABEL_GAP = 14
 
 /** The part of the room that has something in it, so the map is not mostly empty floor. */
 function boundsOf(map: Map) {
@@ -16,7 +18,8 @@ function boundsOf(map: Map) {
   const left = Math.min(...edges.map(edge => edge.left)) - PADDING
   const top = Math.min(...edges.map(edge => edge.top)) - PADDING
   const right = Math.max(...edges.map(edge => edge.right)) + PADDING
-  const bottom = Math.max(...edges.map(edge => edge.bottom)) + PADDING
+  // Extra room at the bottom for the name under the lowest table.
+  const bottom = Math.max(...edges.map(edge => edge.bottom)) + PADDING + LABEL_GAP * 2
   return { left, top, width: right - left, height: bottom - top }
 }
 
@@ -46,11 +49,18 @@ function RoomMap({ map }: { map: Map }) {
       ))}
       {map.tables.map((table, index) => {
         const box = tableBox(table.shape, table.chairs)
+        // How far the turned table reaches below its centre, so its name can sit just under it.
+        const turn = (table.rotation * Math.PI) / 180
+        const below = (Math.abs(box.width * Math.sin(turn)) + Math.abs(box.height * Math.cos(turn))) / 2
         return (
-          <div key={`table-${index}`} aria-hidden="true" style={{ ...place(table.x, table.y, box.width, box.height), transform: `rotate(${table.rotation}deg)` }}
-            className={clsx('absolute flex items-center justify-center', table.shape === 'round' ? 'rounded-full' : 'rounded-[4px]',
-              table.mine ? 'z-[1] bg-ink text-cream shadow-[0_0_0_4px_rgba(46,31,26,0.18)]' : 'bg-white text-ink2 shadow-[0_0_0_1px_rgba(46,31,26,0.16)]')}>
-            <span className={clsx('whitespace-nowrap font-sans leading-none', table.mine && 'font-semibold')} style={{ fontSize: 'clamp(6px, 2cqw, 12px)', transform: `rotate(${-table.rotation}deg)` }}>
+          <div key={`table-${index}`} aria-hidden="true">
+            <div style={{ ...place(table.x, table.y, box.width, box.height), transform: `rotate(${table.rotation}deg)` }}
+              className={clsx('absolute', table.shape === 'round' ? 'rounded-full' : 'rounded-[4px]',
+                table.mine ? 'z-[1] bg-ink shadow-[0_0_0_4px_rgba(46,31,26,0.18)]' : 'bg-white shadow-[0_0_0_1px_rgba(46,31,26,0.16)]')} />
+            <span
+              className={clsx('absolute z-[2] -translate-x-1/2 whitespace-nowrap font-sans leading-none', table.mine ? 'font-semibold text-ink' : 'text-ink2')}
+              style={{ left: percent(table.x - bounds.left, bounds.width), top: percent(table.y + below + LABEL_GAP - bounds.top, bounds.height), fontSize: 'clamp(8px, 2.6cqw, 13px)' }}
+            >
               {table.label}
             </span>
           </div>
