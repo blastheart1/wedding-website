@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { buildPeople, parsePersonKey, type Person } from '@/lib/seating/people'
-import { movePerson, nextTableLabel, resizeTable, type Assignment, type SeatingTable, type SeatTarget } from '@/lib/seating/rules'
+import { movePerson, nextTableLabel, resizeTable, type Assignment, type SeatingTable, type SeatTarget, type TableShape } from '@/lib/seating/rules'
 import type { SeatingPlan } from '@/lib/seating/schemas'
 import { errorMessage, seatingApi, type SeatingData, type TableDraft } from './api'
 
@@ -13,7 +13,7 @@ export interface SeatingPlanState {
   /** Read out by screen readers after each change. */
   announcement: string
   move: (key: string, target: SeatTarget) => boolean
-  addTable: (x: number, y: number) => void
+  addTable: (x: number, y: number, shape?: TableShape) => void
   updateTable: (id: number, changes: TableDraft) => void
   removeTable: (id: number) => void
   savePlan: (plan: SeatingPlan) => void
@@ -33,6 +33,7 @@ export function useSeatingPlan(): SeatingPlanState {
   const latest = useRef<SeatingData | null>(null)
   const queue = useRef<Promise<void>>(Promise.resolve())
   const waiting = useRef(0)
+  const pendingLabels = useRef<string[]>([])
 
   const put = useCallback((next: SeatingData) => { latest.current = next; setData(next) }, [])
 
@@ -86,11 +87,14 @@ export function useSeatingPlan(): SeatingPlanState {
     return true
   }, [put, save])
 
-  const addTable = useCallback((x: number, y: number) => {
+  const addTable = useCallback((x: number, y: number, shape: TableShape = 'round') => {
     const current = latest.current
     if (!current) return
-    const label = nextTableLabel(current.tables)
-    save(() => seatingApi.addTable({ label, x, y }), (state, table: SeatingTable) => ({ ...state, tables: [...state.tables, table] }), true)
+    // Numbered after the tables on screen and the ones still on their way to the server.
+    const label = nextTableLabel([...current.tables, ...pendingLabels.current.map(pending => ({ label: pending }))])
+    pendingLabels.current = [...pendingLabels.current, label]
+    // A couple's table starts with two chairs; the others with the usual ten.
+    save(() => seatingApi.addTable({ label, x, y, shape, ...(shape === 'couple' ? { chairs: 2 } : {}) }).finally(() => { pendingLabels.current = pendingLabels.current.filter(pending => pending !== label) }), (state, table: SeatingTable) => ({ ...state, tables: [...state.tables, table] }), true)
     setAnnouncement(`${label} added.`)
   }, [save])
 

@@ -2,33 +2,32 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
-import { LayoutGrid, Plus } from 'lucide-react'
-import { clamp, snap } from '@/lib/seating/geometry'
+import { Lock, LockOpen, Plus } from 'lucide-react'
+import { clamp, snap, tableReach } from '@/lib/seating/geometry'
 import { personKey, type Person } from '@/lib/seating/people'
-import { seatedAt, seatingWarnings, unseatedCount } from '@/lib/seating/rules'
+import { CHAIRS, seatedAt, seatingWarnings, unseatedCount, type TableShape } from '@/lib/seating/rules'
 import type { FloorShape } from '@/lib/seating/schemas'
-import { Button, Group, Row, Segmented } from '@/app/admin/_ui/primitives'
+import { Button, Group, Row } from '@/app/admin/_ui/primitives'
 import { LoadState, ToggleRow } from '@/app/admin/_ui/forms'
 import { IconButton, PageHeader } from '@/app/admin/_ui/PageHeader'
 import { parseDraggedPerson, parseDrop } from './api'
-import { Floor, ZOOM } from './Floor'
+import { Floor, ZOOM, type FloorSpot } from './Floor'
+import { FloorMenu } from './FloorMenu'
 import { GuestList } from './GuestList'
 import { ShapeNode } from './ShapeNode'
 import { ShapeSheet } from './ShapeSheet'
-import { TableNode, type FloorMode } from './TableNode'
+import { TableNode } from './TableNode'
 import { TableSheet } from './TableSheet'
 import { useSeatingPlan } from './useSeatingPlan'
-
-const MODES: readonly { value: FloorMode; label: string }[] = [
-  { value: 'seat', label: 'Seat guests' },
-  { value: 'arrange', label: 'Arrange room' },
-]
 
 /** Below this, names on chairs are too small to read, so the plan never opens further out than this. */
 const READABLE_ZOOM = 0.75
 
-/** New tables are placed at least this far from the others, so they never land on top of one another. */
+/** Tables added with the plus button are placed at least this far from the others, so they never land on one another. */
 const NEW_TABLE_GAP = 340
+
+/** Remembers on this device whether the layout was locked. */
+const LOCK_KEY = 'seat-plan-layout-locked'
 
 type Panel = { kind: 'table'; id: number } | { kind: 'shape'; id: string } | null
 
@@ -38,7 +37,9 @@ const newShapeId = () => `shape-${Date.now().toString(36)}${Math.random().toStri
 export function SeatingView() {
   const plan = useSeatingPlan()
   const { data, people } = plan
-  const [mode, setMode] = useState<FloorMode>('seat')
+  // Locked: tables and shapes stay where they are, so seating cannot nudge the layout by accident.
+  const [locked, setLocked] = useState(false)
+  const [menu, setMenu] = useState<FloorSpot | null>(null)
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const [panel, setPanel] = useState<Panel>(null)
@@ -46,6 +47,10 @@ export function SeatingView() {
   const floor = useRef<HTMLDivElement>(null)
   const fitted = useRef(false)
   const recentSpots = useRef<{ x: number; y: number }[]>([])
+
+  useEffect(() => { try { setLocked(window.localStorage.getItem(LOCK_KEY) === '1') } catch { /* private window: stays unlocked */ } }, [])
+  const toggleLock = () => setLocked(current => { try { window.localStorage.setItem(LOCK_KEY, current ? '0' : '1') } catch { /* not remembered */ } return !current })
+  const closeMenu = useCallback(() => setMenu(null), [])
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -114,26 +119,28 @@ export function SeatingView() {
 
   const { room, shapes } = data.plan
   const saveShapes = (next: FloorShape[]) => plan.savePlan({ ...data.plan, shapes: next })
-  const addShape = () => {
-    const centre = visibleCentre()
+  /** The nearest spot where something reaching `reach` from its centre still sits wholly inside the room. */
+  const inRoom = (spot: { x: number; y: number }, reach = 60) => ({ x: clamp(snap(spot.x), reach, room.width - reach), y: clamp(snap(spot.y), reach, room.height - reach) })
+  const addShape = (at?: { x: number; y: number }) => {
+    const centre = inRoom(at ?? visibleCentre())
     const shape: FloorShape = { id: newShapeId(), label: 'Stage', x: centre.x, y: centre.y, width: 260, height: 100 }
     saveShapes([...shapes, shape])
-    setMode('arrange')
     setPanel({ kind: 'shape', id: shape.id })
   }
-  const addTable = () => {
-    // Start in the middle of what is on screen, then step along until the spot is clear of other tables.
-    const centre = visibleCentre()
+  const addTable = (shape: TableShape = 'round', at?: { x: number; y: number }) => {
+    // Where the floor was clicked, or else the middle of what is on screen; then step along until clear of other tables.
+    const reach = tableReach(shape, shape === 'couple' ? 2 : CHAIRS.start)
+    const centre = inRoom(at ?? visibleCentre(), reach)
     // Tables asked for a moment ago may not be back from the server yet, so their spots are remembered too.
     const spots = [...data.tables, ...recentSpots.current]
-    const taken = (x: number, y: number) => spots.some(table => Math.hypot(table.x - x, table.y - y) < NEW_TABLE_GAP)
+    const taken = (x: number, y: number) => spots.some(table => Math.hypot(table.x - x, table.y - y) < (at ? 40 : NEW_TABLE_GAP))
     let spot = centre
     for (let step = 1; taken(spot.x, spot.y) && step <= 40; step += 1) {
       const column = step % 5, row = Math.floor(step / 5)
-      spot = { x: clamp(centre.x + column * NEW_TABLE_GAP, 60, room.width - 60), y: clamp(centre.y + row * NEW_TABLE_GAP, 60, room.height - 60) }
+      spot = inRoom({ x: centre.x + column * NEW_TABLE_GAP, y: centre.y + row * NEW_TABLE_GAP }, reach)
     }
     recentSpots.current = [...recentSpots.current.slice(-8), spot]
-    plan.addTable(spot.x, spot.y)
+    plan.addTable(spot.x, spot.y, shape)
   }
   const openTable = panel?.kind === 'table' ? data.tables.find(table => table.id === panel.id) : undefined
   const openShape = panel?.kind === 'shape' ? shapes.find(shape => shape.id === panel.id) : undefined
@@ -143,39 +150,46 @@ export function SeatingView() {
   return (
     <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDraggingKey(null)}>
       <PageHeader title="Seat plan" subtitle={`${data.tables.length} ${data.tables.length === 1 ? 'table' : 'tables'} · ${seatOf.size} of ${people.length} seated`}>
-        <IconButton icon={LayoutGrid} label="Add a shape (stage, dance floor, entrance)" onClick={addShape} />
-        <IconButton icon={Plus} label="Add a table" tone="primary" onClick={addTable} />
+        <IconButton icon={locked ? Lock : LockOpen} label={locked ? 'Layout is locked. Unlock to move tables' : 'Lock the layout so tables cannot be moved'} onClick={toggleLock} />
+        <IconButton icon={Plus} label="Add a table" tone="primary" onClick={() => addTable()} />
       </PageHeader>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="w-full sm:w-[300px]"><Segmented value={mode} options={MODES} onChange={next => { setMode(next); setSelectedKey(null) }} label="What dragging does" /></div>
-        <p className="min-h-[20px] text-[14px] text-black/55" role="status" aria-live="polite">
-          {selected ? `Tap a table or an empty chair to seat ${selected.name}.` : mode === 'arrange' ? 'Drag tables and shapes to lay out the room.' : 'Drag a name onto a table, or tap a name and then a table.'}
-        </p>
-      </div>
+      <p className="mt-3 min-h-[20px] text-[14px] text-black/60" role="status" aria-live="polite">
+        {selected
+          ? `Click a table or an empty chair to seat ${selected.name}.`
+          : locked
+            ? 'Drag a name onto a table, or click a table and type names. The layout is locked.'
+            : 'Drag a name onto a table, or click a table and type names. Drag a table to move it, drag empty floor to move around, click empty floor to add a table.'}
+      </p>
       <p className="sr-only" role="status" aria-live="polite">{plan.announcement}</p>
 
       {/* Side by side on a wide screen. On a phone the floor sits above the list, both in view at once. */}
       <div className="mt-3 flex flex-col gap-3 md:h-[calc(100dvh-240px)] md:min-h-[520px] md:flex-row">
         <div className="order-2 h-[46dvh] min-h-[300px] shrink-0 md:order-1 md:h-auto md:min-h-0 md:w-[290px]">
-          <GuestList people={people} seatOf={seatOf} selectedKey={selectedKey} draggable={mode === 'seat'} onSelect={select} onUnseat={key => plan.move(key, null)} />
+          <GuestList people={people} seatOf={seatOf} selectedKey={selectedKey} draggable onSelect={select} onUnseat={key => plan.move(key, null)} />
         </div>
         <div className="order-1 h-[44dvh] min-h-[280px] min-w-0 md:order-2 md:h-auto md:min-h-0 md:flex-1">
-          <Floor ref={floor} room={room} zoom={zoom} onZoom={setZoomTo} onFit={fit} onBackgroundClick={() => setSelectedKey(null)}>
+          <Floor ref={floor} room={room} zoom={zoom} onZoom={setZoomTo} onFit={fit}
+            onBlankClick={spot => { if (selectedKey) setSelectedKey(null); else setMenu(spot) }}
+            overlay={menu && (
+              <FloorMenu left={menu.left} top={menu.top} onClose={closeMenu}
+                onAddTable={shape => { addTable(shape, menu); setMenu(null) }}
+                onAddShape={() => { addShape(menu); setMenu(null) }} />
+            )}>
             {shapes.map(shape => (
-              <ShapeNode key={shape.id} shape={shape} room={room} mode={mode} zoom={zoom} onOpen={id => setPanel({ kind: 'shape', id })}
+              <ShapeNode key={shape.id} shape={shape} room={room} locked={locked} zoom={zoom} onOpen={id => setPanel({ kind: 'shape', id })}
                 onChange={next => saveShapes(shapes.map(item => (item.id === next.id ? next : item)))} />
             ))}
             {data.tables.map(table => (
-              <TableNode key={table.id} table={table} seated={seatedAt(data.assignments, table.id)} peopleByKey={peopleByKey} room={room} mode={mode} zoom={zoom}
+              <TableNode key={table.id} table={table} seated={seatedAt(data.assignments, table.id)} peopleByKey={peopleByKey} room={room} locked={locked} zoom={zoom}
                 selectedKey={selectedKey} onSelectPerson={select} onSeat={seatSelected} onOpen={id => setPanel({ kind: 'table', id })}
-                onMoved={(id, x, y) => plan.updateTable(id, { x, y })} />
+                onMoved={(id, x, y) => plan.updateTable(id, { x, y })} onTurned={(id, rotation) => plan.updateTable(id, { rotation })} />
             ))}
             {!data.tables.length && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-[17px] text-black/55">The room is empty.</p>
-                  <div className="mt-3"><Button tone="primary" onClick={addTable}>Add your first table</Button></div>
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="pointer-events-auto text-center" data-floor-item="true">
+                  <p className="text-[17px] text-black/70">The room is empty. Click anywhere to add a table.</p>
+                  <div className="mt-3"><Button tone="primary" onClick={() => addTable()}>Add your first table</Button></div>
                 </div>
               </div>
             )}
@@ -215,6 +229,9 @@ export function SeatingView() {
             const key = personKey(assignment.invitationId, assignment.index)
             return { chair: assignment.chair, person: peopleByKey.get(key) ?? null, unseat: () => plan.move(key, null) }
           })}
+          candidates={people.filter(person => !seatedAt(data.assignments, openTable.id).some(assignment => personKey(assignment.invitationId, assignment.index) === person.key))}
+          seatOf={seatOf}
+          onSeat={key => plan.move(key, { tableId: openTable.id })}
           onChange={changes => plan.updateTable(openTable.id, changes)}
           onDelete={() => { setPanel(null); plan.removeTable(openTable.id) }}
           onClose={() => setPanel(null)}

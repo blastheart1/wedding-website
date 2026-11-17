@@ -13,7 +13,19 @@ export const SHAPE_LABEL: Record<TableShape, string> = {
 }
 
 export const CHAIRS = { min: 1, max: 24, start: 10 } as const
+/** Tables turn freely, to the nearest degree. Buttons turn by this much, and a free turn settles on these angles when close. */
 export const ROTATION_STEP = 15
+export const ROTATION_SNAP_WITHIN = 4
+
+/** Any angle as a whole number from 0 to 359. */
+export const normaliseRotation = (degrees: number): number => ((Math.round(degrees) % 360) + 360) % 360
+
+/** A free turn that lands within a few degrees of a 15-degree step settles on it, so straight is easy to hit. */
+export function settleRotation(degrees: number): number {
+  const angle = normaliseRotation(degrees)
+  const nearest = Math.round(angle / ROTATION_STEP) * ROTATION_STEP
+  return Math.abs(angle - nearest) <= ROTATION_SNAP_WITHIN ? normaliseRotation(nearest) : angle
+}
 
 export interface SeatingTable {
   id: number

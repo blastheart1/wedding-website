@@ -228,13 +228,55 @@ test('geometry: turning a table moves its chairs around the centre without chang
   assert.equal(geometry.clamp(-5, 0, 10), 0)
 })
 
+test('rules: tables turn freely to any whole degree, and settle on a straight angle when close', () => {
+  assert.equal(schemas.tableUpdateSchema.safeParse({ id: 1, rotation: 37 }).success, true)
+  assert.equal(schemas.tableUpdateSchema.safeParse({ id: 1, rotation: 359 }).success, true)
+  assert.equal(rules.normaliseRotation(-30), 330)
+  assert.equal(rules.normaliseRotation(725.4), 5)
+  assert.equal(rules.settleRotation(37), 37)
+  assert.equal(rules.settleRotation(88), 90)
+  assert.equal(rules.settleRotation(358), 0)
+  assert.equal(rules.settleRotation(-3), 0)
+  assert.equal(rules.settleRotation(52), 52)
+  // A freely turned table still keeps its chairs apart and at the same distance.
+  const flat = geometry.chairPoints('rect', 8, 0), turned = geometry.chairPoints('rect', 8, 37)
+  flat.forEach((point, index) => assert.ok(Math.abs(Math.hypot(point.x, point.y) - Math.hypot(turned[index].x, turned[index].y)) < 0.2))
+})
+
+// ─── Seating by typing a name ─────────────────────────────────────────────────
+const suggest = load('src/lib/seating/suggest.ts')
+
+test('suggest: typed text finds guests by name, best match first, plus ones by their guest too', () => {
+  const list = people.buildPeople([
+    invitation(1, 'Jazzer Santos', 2), invitation(2, 'Ana Reyes', 2, yes(2, ['Maria Cruz'])), invitation(3, 'Mariana Jazmin', 1), invitation(4, 'José Peña', 1),
+  ])
+  const names = query => plain(suggest.suggestPeople(query, list).map(person => person.name))
+  assert.deepEqual(names('jaz'), ['Jazzer Santos', "Jazzer's plus one", 'Mariana Jazmin'])
+  assert.deepEqual(names('maria'), ["Maria Cruz · Ana's plus one", 'Mariana Jazmin'])
+  assert.deepEqual(names('Maria Cruz'), ["Maria Cruz · Ana's plus one"])
+  assert.deepEqual(names('reyes'), ['Ana Reyes'])
+  assert.deepEqual(names('jose pena'), ['José Peña'], 'accents do not matter')
+  assert.deepEqual(names('  ANA  '), ['Ana Reyes', "Maria Cruz · Ana's plus one", 'Mariana Jazmin'])
+  assert.deepEqual(names(''), [])
+  assert.deepEqual(names('zzz'), [])
+  assert.equal(suggest.suggestPeople('a', list, 2).length, 2)
+})
+
+test('suggest: a comma or a new line finishes a name; the rest is still being typed', () => {
+  assert.deepEqual(plain(suggest.splitNames('Ana')), { finished: [], typing: 'Ana' })
+  assert.deepEqual(plain(suggest.splitNames('Ana,')), { finished: ['Ana'], typing: '' })
+  assert.deepEqual(plain(suggest.splitNames('Ana Reyes, Ben ,  Car')), { finished: ['Ana Reyes', 'Ben'], typing: 'Car' })
+  assert.deepEqual(plain(suggest.splitNames('Ana\nBen\n')), { finished: ['Ana', 'Ben'], typing: '' })
+  assert.deepEqual(plain(suggest.splitNames(',, ,')), { finished: [], typing: '' })
+})
+
 // ─── Input checks ─────────────────────────────────────────────────────────────
 test('schemas: a table needs sensible values', () => {
   assert.deepEqual(plain(schemas.tableCreateSchema.parse({ x: 100, y: 200 })), { shape: 'round', chairs: 10, x: 100, y: 200, rotation: 0 })
   assert.equal(schemas.tableCreateSchema.parse({ label: '  Family  ', shape: 'couple', chairs: 2, x: 0, y: 0, rotation: 90 }).label, 'Family')
   const bad = [
     { x: 1, y: 1, chairs: 0 }, { x: 1, y: 1, chairs: 25 }, { x: 1, y: 1, chairs: 2.5 }, { x: 1, y: 1, shape: 'oval' }, { x: -1, y: 1 }, { x: 1, y: 99999 },
-    { x: 1, y: 1, rotation: 10 }, { x: 1, y: 1, rotation: 360 }, { x: 1, y: 1, label: '' }, { x: 1, y: 1, label: 'x'.repeat(41) }, { x: '1', y: 1 }, {},
+    { x: 1, y: 1, rotation: 10.5 }, { x: 1, y: 1, rotation: -1 }, { x: 1, y: 1, rotation: 360 }, { x: 1, y: 1, label: '' }, { x: 1, y: 1, label: 'x'.repeat(41) }, { x: '1', y: 1 }, {},
   ]
   for (const input of bad) assert.equal(schemas.tableCreateSchema.safeParse(input).success, false, JSON.stringify(input))
   assert.equal(schemas.tableUpdateSchema.safeParse({ chairs: 4 }).success, false, 'an update names its table')
