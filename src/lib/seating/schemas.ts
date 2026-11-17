@@ -5,7 +5,7 @@ import { CHAIRS, TABLE_SHAPES } from './rules'
 /** Everything the seat plan accepts from a browser is checked here first. */
 
 const id = z.number().int().positive().max(999_999_999)
-const coordinate = z.number().int().min(0).max(FLOOR.max)
+const coordinate = z.number().int().min(-FLOOR.limit).max(FLOOR.limit)
 const label = (what: string) => z.string().trim().min(1, `${what} needs a name.`).max(40, `${what} names can be up to 40 characters.`)
 const chairs = z.number().int().min(CHAIRS.min, 'A table needs at least one chair.').max(CHAIRS.max, `A table can have up to ${CHAIRS.max} chairs.`)
 const rotation = z.number().int().min(0, 'A turn is between 0 and 359 degrees.').max(359, 'A turn is between 0 and 359 degrees.')

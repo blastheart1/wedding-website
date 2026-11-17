@@ -5,7 +5,8 @@ import type { TableShape } from './rules'
  * CSS pixel at 100% zoom). Shared by the planner and by the guest's small map.
  */
 
-export const FLOOR = { width: 1600, height: 1000, min: 600, max: 4000, grid: 10 } as const
+/** `limit` is how far from the origin anything may sit, in either direction: the floor is open, not a fixed room. */
+export const FLOOR = { width: 1600, height: 1000, min: 600, max: 4000, grid: 10, limit: 20000 } as const
 
 /** A chair is drawn as a name pill; pills never overlap at this spacing. */
 export const CHAIR = { width: 74, height: 22, spacing: 80 } as const
@@ -80,11 +81,26 @@ export function rotatePoint(point: Point, degrees: number): Point {
   return { x: point.x * cos - point.y * sin, y: point.x * sin + point.y * cos }
 }
 
-/** The centre of each chair relative to the table's centre, chair 0 first. */
+/** Which way a chair sits out from a straight-sided table before it is turned: up, down, left or right. */
+function outward(shape: TableShape, chairs: number, point: Point): Point {
+  const box = tableBox(shape, chairs)
+  if (shape === 'square' && Math.abs(point.y) <= box.height / 2) return { x: Math.sign(point.x), y: 0 }
+  return { x: 0, y: Math.sign(point.y) }
+}
+
+/**
+ * The centre of each chair relative to the table's centre, chair 0 first.
+ * A chair's name is always written level, so beside a turned table it needs
+ * more room than above or below one: chairs move out a little as the table
+ * turns, enough that a name never runs over the table top.
+ */
 export function chairPoints(shape: TableShape, chairs: number, rotation = 0): Point[] {
+  const extra = (CHAIR.width - CHAIR.height) / 2
   return unrotated(shape, chairs).map(point => {
     const turned = rotatePoint(point, rotation)
-    return { x: Math.round(turned.x * 10) / 10, y: Math.round(turned.y * 10) / 10 }
+    const away = shape === 'round' ? { x: 0, y: 0 } : rotatePoint(outward(shape, chairs, point), rotation)
+    const push = Math.abs(away.x) * extra
+    return { x: Math.round((turned.x + away.x * push) * 10) / 10, y: Math.round((turned.y + away.y * push) * 10) / 10 }
   })
 }
 
@@ -92,10 +108,49 @@ export function chairPoints(shape: TableShape, chairs: number, rotation = 0): Po
 export function tableReach(shape: TableShape, chairs: number): number {
   const box = tableBox(shape, chairs)
   const corner = shape === 'round' ? box.width / 2 : Math.hypot(box.width / 2, box.height / 2)
-  const farthestChair = Math.max(...unrotated(shape, chairs).map(point => Math.hypot(point.x, point.y)), 0) + CHAIR.width / 2
+  // Turned on its side a table's chairs sit a little further out (see chairPoints), so that is allowed for.
+  const farthestChair = Math.max(...unrotated(shape, chairs).map(point => Math.hypot(point.x, point.y)), 0) + CHAIR.width / 2 + (shape === 'round' ? 0 : (CHAIR.width - CHAIR.height) / 2)
   return Math.ceil(Math.max(corner, farthestChair))
 }
 
 export const snap = (value: number): number => Math.round(value / FLOOR.grid) * FLOOR.grid
 
 export const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value))
+
+export interface Bounds { left: number; top: number; right: number; bottom: number }
+
+/** The box around everything on the floor (tables with their chairs, and shapes), or null when the floor is empty. */
+export function contentBounds(
+  tables: readonly { shape: TableShape; chairs: number; x: number; y: number }[],
+  shapes: readonly { x: number; y: number; width: number; height: number }[],
+): Bounds | null {
+  const boxes: Bounds[] = [
+    ...tables.map(table => { const reach = tableReach(table.shape, table.chairs); return { left: table.x - reach, top: table.y - reach, right: table.x + reach, bottom: table.y + reach } }),
+    ...shapes.map(shape => ({ left: shape.x - shape.width / 2, top: shape.y - shape.height / 2, right: shape.x + shape.width / 2, bottom: shape.y + shape.height / 2 })),
+  ]
+  if (!boxes.length) return null
+  return {
+    left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
+    right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
+  }
+}
+
+export interface FloorView { x: number; y: number; zoom: number }
+
+/** The view that shows the given bounds centred in a frame, zoomed to fit with a margin but never past `maxZoom`. */
+export function viewToFit(bounds: Bounds | null, frame: Box, limits: { min: number; max: number }, margin = 48): FloorView {
+  if (!bounds || frame.width <= 0 || frame.height <= 0) return { x: frame.width / 2, y: frame.height / 2, zoom: clamp(1, limits.min, limits.max) }
+  const width = Math.max(1, bounds.right - bounds.left), height = Math.max(1, bounds.bottom - bounds.top)
+  const zoom = clamp(Math.min((frame.width - margin * 2) / width, (frame.height - margin * 2) / height), limits.min, limits.max)
+  return {
+    zoom,
+    x: frame.width / 2 - ((bounds.left + bounds.right) / 2) * zoom,
+    y: frame.height / 2 - ((bounds.top + bounds.bottom) / 2) * zoom,
+  }
+}
+
+/** Zooms about a point on screen, so what is under the pointer stays under it. */
+export function zoomAbout(view: FloorView, zoom: number, point: Point): FloorView {
+  const ratio = zoom / view.zoom
+  return { zoom, x: point.x - (point.x - view.x) * ratio, y: point.y - (point.y - view.y) * ratio }
+}

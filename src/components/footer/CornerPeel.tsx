@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { Mail, X } from 'lucide-react'
+import { CreditsBoard } from './CreditsBoard'
 import { EspressoGame } from './EspressoGame'
 import { useCornerBounce } from './useCornerBounce'
 
@@ -133,6 +134,8 @@ export function CornerPeel({ email, url }: CornerPeelProps) {
         onCancel={event => { event.preventDefault(); close() }}>
         <div className="peel-sheet">
           <EspressoGame mounted={stage !== 'closed'} />
+          {/* A little board on the wall naming whose 3D models the site uses. */}
+          {stage === 'open' && <CreditsBoard />}
           <button type="button" className="peel-close" onClick={close} aria-label="Fold the corner back">
             <X size={20} strokeWidth={2} aria-hidden="true" />
           </button>

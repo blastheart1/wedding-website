@@ -2,13 +2,12 @@
 
 import { useState } from 'react'
 import clsx from 'clsx'
-import { clamp, snap } from '@/lib/seating/geometry'
+import { FLOOR, clamp, snap } from '@/lib/seating/geometry'
 import type { FloorShape } from '@/lib/seating/schemas'
 import { useFloorDrag } from './useFloorDrag'
 
 interface ShapeNodeProps {
   shape: FloorShape
-  room: { width: number; height: number }
   /** Locked: shapes cannot be moved or resized. */
   locked: boolean
   zoom: number
@@ -19,7 +18,7 @@ interface ShapeNodeProps {
 const MIN_SIZE = 40
 
 /** A labelled block on the floor (stage, dance floor, entrance). Nobody sits at it. */
-export function ShapeNode({ shape, room, locked, zoom, onOpen, onChange }: ShapeNodeProps) {
+export function ShapeNode({ shape, locked, zoom, onOpen, onChange }: ShapeNodeProps) {
   const [draft, setDraft] = useState<FloorShape | null>(null)
   const shown = draft ?? shape
   const arranging = !locked
@@ -27,7 +26,7 @@ export function ShapeNode({ shape, room, locked, zoom, onOpen, onChange }: Shape
   const move = useFloorDrag({
     enabled: arranging,
     zoom,
-    onDrag: (dx, dy) => setDraft({ ...shape, x: clamp(snap(shape.x + dx), 0, room.width), y: clamp(snap(shape.y + dy), 0, room.height) }),
+    onDrag: (dx, dy) => setDraft({ ...shape, x: clamp(snap(shape.x + dx), -FLOOR.limit, FLOOR.limit), y: clamp(snap(shape.y + dy), -FLOOR.limit, FLOOR.limit) }),
     onEnd: moved => { if (moved && draft) onChange(draft); else onOpen(shape.id); setDraft(null) },
   })
   const resize = useFloorDrag({

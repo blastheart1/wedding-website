@@ -29,7 +29,7 @@ export function FloorMenu({ left, top, onAddTable, onAddShape, onClose }: FloorM
   }, [onClose])
 
   return (
-    <div ref={menu} role="menu" aria-label="Add to the floor here" data-seating-menu="true"
+    <div ref={menu} role="menu" aria-label="Add to the floor here" data-seating-menu="true" data-floor-item="true"
       className="absolute z-20 overflow-hidden rounded-xl bg-white py-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.28),0_0_0_1px_rgba(0,0,0,0.08)]"
       style={{ width: WIDTH, left: `clamp(8px, ${left}px, calc(100% - ${WIDTH + 8}px))`, top: `clamp(8px, ${top}px, calc(100% - 250px))` }}>
       <p className="px-3.5 pb-1 pt-1.5 text-[12px] uppercase tracking-[0.05em] text-black/45">Add a table here</p>

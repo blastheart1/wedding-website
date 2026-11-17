@@ -352,6 +352,30 @@ test('espresso: the camera glides through every key without a jump or a stop', (
   assert.ok(gap(cameraAt(middle - 0.05), cameraAt(middle + 0.05)) > 1e-4, 'no stop at a key')
 })
 
+test('credits: every third-party model is named on the board in the coffee bar, with author, source and licence', () => {
+  const credits = load('src/lib/credits.ts')
+  const models = credits.CREDIT_GROUPS.flatMap(group => group.models)
+  assert.equal(models.length, 14)
+  for (const model of models) {
+    assert.ok(model.title && model.author, JSON.stringify(model))
+    assert.match(model.url, /^https:\/\/sketchfab\.com\/3d-models\/[0-9a-f]{32}$/)
+  }
+  assert.equal(new Set(models.map(model => model.url)).size, models.length, 'no model is listed twice')
+  for (const author of ['mreslan', 'mazia', 'senorp3dro', 'PixiArch', 'lanzaboy', 'misterwils', 'Rofnay', 'grafikzeug', 'jswing_1', 'Gamedirection', 'vav206', 'Kevin.Popescu', 'auspicious', 'GiantMidget']) {
+    assert.ok(models.some(model => model.author === author), author)
+  }
+  assert.equal(credits.CREDIT_LICENCE.url, 'https://creativecommons.org/licenses/by/4.0/')
+  assert.match(credits.CREDIT_CHANGES, /simplified/)
+  const board = read('src/components/footer/CreditsBoard.tsx')
+  assert.match(board, /CREDIT_GROUPS\.map/)
+  assert.match(board, /CREDIT_LICENCE\.url/)
+  assert.match(board, /CREDIT_CHANGES/)
+  assert.match(board, /rel="noopener noreferrer"/)
+  assert.ok(!EMOJI.test(board))
+  assert.match(read('src/components/footer/CornerPeel.tsx'), /<CreditsBoard \/>/, 'the board hangs in the peeled corner, not on the page')
+  assert.ok(!fs.existsSync(path.join(root, 'src/app/credits')), 'still no separate credits page')
+})
+
 test('espresso: the scene is built from the downloaded models, loaded only when peeled', () => {
   const scene = read('src/world/coffee/espresso-scene.ts'), assets = read('src/world/coffee/assets.ts')
   const MODELS = ['machine', 'latte-cup', 'espresso-cup', 'pitcher', 'grinder']

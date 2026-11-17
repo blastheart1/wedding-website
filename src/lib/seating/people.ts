@@ -42,6 +42,12 @@ export function parsePersonKey(key: string): { invitationId: number; index: numb
 
 const firstWord = (name: string): string => name.trim().split(/\s+/)[0] ?? ''
 
+/** A chair has room for about this many letters. */
+const CHAIR_LETTERS = 12
+
+/** What fits on a chair: the whole name when it is short ("Tita Jop", "Ate Adel"), otherwise the first word. */
+const chairName = (name: string): string => (name.trim().length <= CHAIR_LETTERS ? name.trim() : firstWord(name))
+
 /** "Jazzer's plus one", "Jazzer's plus two". */
 export function plusOneLabel(hostName: string, index: number): string {
   return `${firstWord(hostName)}'s plus ${COUNT_WORDS[index - 1] ?? index}`
@@ -57,7 +63,7 @@ function attendanceOf(invitation: SeatingInvitation, index: number): Attendance 
 function personOf(invitation: SeatingInvitation, index: number): Person {
   const base = { key: personKey(invitation.id, index), invitationId: invitation.id, index, attendance: attendanceOf(invitation, index) }
   if (index === 0) {
-    return { ...base, name: invitation.guestName.trim(), shortName: firstWord(invitation.guestName), hostName: null }
+    return { ...base, name: invitation.guestName.trim(), shortName: chairName(invitation.guestName), hostName: null }
   }
   const label = plusOneLabel(invitation.guestName, index)
   // The guest names who they bring when they RSVP; until then the plus one is known only by its host.
@@ -65,12 +71,12 @@ function personOf(invitation: SeatingInvitation, index: number): Person {
   return {
     ...base,
     name: named ? `${named} · ${label}` : label,
-    shortName: named ? firstWord(named) : `${firstWord(invitation.guestName)} +${index}`,
+    shortName: named ? chairName(named) : `${firstWord(invitation.guestName)} +${index}`,
     hostName: invitation.guestName.trim(),
   }
 }
 
-/** Two people with the same short name get a last initial where they have one: "Ana S.", "Ana R." */
+/** Two people whose long names shorten to the same word get a last initial: "Maria S.", "Maria R." */
 function distinctShortNames(people: readonly Person[]): Person[] {
   const counts = new Map<string, number>()
   for (const person of people) counts.set(person.shortName.toLowerCase(), (counts.get(person.shortName.toLowerCase()) ?? 0) + 1)
@@ -79,7 +85,8 @@ function distinctShortNames(people: readonly Person[]): Person[] {
     const fullName = person.name.split(' · ')[0]
     const words = fullName.trim().split(/\s+/)
     // An unnamed plus one ("Jazzer's plus one") has no surname of its own to borrow from.
-    if (words.length < 2 || (person.index > 0 && fullName === person.name)) return person
+    // Nothing to add when the chair already shows the whole name, or for an unnamed plus one ("Jazzer +1").
+    if (words.length < 2 || person.shortName === fullName.trim() || (person.index > 0 && fullName === person.name)) return person
     return { ...person, shortName: `${person.shortName} ${words[words.length - 1][0].toUpperCase()}.` }
   })
 }

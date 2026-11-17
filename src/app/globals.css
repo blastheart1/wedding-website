@@ -368,6 +368,19 @@ html[data-site-motion=reduced] .corner-peel{animation:none}
 .peel-action{min-height:44px;padding:0 24px;border:0;border-radius:999px;background:#2e1f1a;font-family:var(--font-jost);font-size:15px;color:#fdfaf6;cursor:pointer;touch-action:manipulation}
 .peel-action[data-quiet=true]{background:#2e1f1a14;color:#2e1f1a}
 .peel-tick:disabled,.peel-action:disabled{opacity:.35;cursor:default}
+/* Credits: a small chalkboard on the wall that grows into the list of model authors. */
+.peel-credits-sign{position:absolute;z-index:2;top:calc(18px + env(safe-area-inset-top));left:calc(14px + env(safe-area-inset-left));min-width:44px;min-height:40px;padding:6px 9px 7px;border:0;border-radius:3px;background:#2f2c29;box-shadow:0 0 0 3px #8a6b4d,0 0 0 4px #5d4632,0 3px 8px #0004;color:#f4efe6;font-family:var(--font-cormorant);font-style:italic;font-size:15px;line-height:1;letter-spacing:.3px;cursor:pointer;transform:rotate(-2.5deg);transform-origin:50% 0}
+.peel-credits-sign:focus-visible,.peel-credits-close:focus-visible,.peel-credits-board a:focus-visible{outline:2px solid #f4efe6;outline-offset:3px}
+.peel-credits-sign:focus-visible{outline-color:#2e1f1a;outline-offset:7px}
+.peel-credits-board{position:absolute;z-index:3;top:calc(14px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));width:min(380px,calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));max-height:min(74dvh,620px);overflow-y:auto;overscroll-behavior:contain;padding:18px 20px 16px;border-radius:4px;background:#2f2c29;box-shadow:0 0 0 6px #8a6b4d,0 0 0 8px #5d4632,0 16px 40px #0006;color:#f4efe6;font-family:var(--font-jost);font-size:14px;line-height:1.45}
+.peel-credits-title{margin:0 40px 6px 0;font-family:var(--font-cormorant);font-style:italic;font-size:26px;line-height:1.1}
+.peel-credits-board h3{margin:14px 0 4px;font-size:11px;font-weight:400;letter-spacing:2.2px;text-transform:uppercase;color:#cbbfae}
+.peel-credits-board ul{margin:0;padding:0;list-style:none}
+.peel-credits-board li{padding:2px 0}
+.peel-credits-board a{color:#fff;text-decoration:underline;text-underline-offset:3px;text-decoration-color:#fff8}
+.peel-credits-note{margin:14px 0 0;font-size:12.5px;color:#cbbfae}
+.peel-credits-note+.peel-credits-note{margin-top:6px}
+.peel-credits-close{position:absolute;top:8px;right:8px;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;border-radius:50%;background:#ffffff1a;color:#f4efe6;cursor:pointer}
 .peel-contact{position:absolute;left:0;right:0;bottom:calc(22px + env(safe-area-inset-bottom));display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 16px;margin:0;padding:0 20px;font-family:var(--font-jost);font-size:15px;color:#7a5c54}
 .peel-contact a{color:#2e1f1a;text-decoration:underline;text-underline-offset:5px}
 .peel-contact .peel-mail{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#2e1f1a14;text-decoration:none}
