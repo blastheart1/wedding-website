@@ -29,7 +29,7 @@ function Chair({ table, chair, x, y, person, leftover, selectedKey, onSelect, on
   const drag = useDraggable({ id: dragId.person(person?.key ?? `empty-${table.id}-${chair}`), disabled: !person })
   const away = person && (person.attendance === 'declined' || person.attendance === 'not_coming')
   const style = { left: x - CHAIR.width / 2, top: y - CHAIR.height / 2, width: CHAIR.width, height: CHAIR.height }
-  const shared = 'absolute flex items-center justify-center rounded-full border px-1.5 text-[11px] leading-none'
+  const shared = 'absolute flex items-center justify-center rounded-full border px-1 text-[11px] leading-none'
 
   if (!person) {
     return (

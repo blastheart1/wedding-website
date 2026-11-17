@@ -64,7 +64,7 @@ test('people: a solo invitation is one entry; three plus ones are numbered in wo
 test('people: once the guest names who they bring, the entry shows that name and still refers to its guest', () => {
   const list = people.buildPeople([invitation(1, 'Jazzer Santos', 3, yes(2, ['Maria Cruz']))])
   assert.equal(list[1].name, "Maria Cruz · Jazzer's plus one")
-  assert.equal(list[1].shortName, 'Maria')
+  assert.equal(list[1].shortName, 'Maria Cruz')
   assert.deepEqual(plain(list.map(person => person.attendance)), ['coming', 'coming', 'not_coming'])
   assert.equal(list[2].name, "Jazzer's plus two")
 })
@@ -78,8 +78,17 @@ test('people: revoked invitations are not on the list, and equal first names get
   const list = people.buildPeople([
     invitation(1, 'Ana Santos'), invitation(2, 'Ana Reyes'), invitation(3, 'Ana', 2), invitation(4, 'Gone Guest', 2, null, 'revoked'),
   ])
-  assert.deepEqual(plain(list.map(person => person.shortName)), ['Ana S.', 'Ana R.', 'Ana', 'Ana +1'])
+  assert.deepEqual(plain(list.map(person => person.shortName)), ['Ana Santos', 'Ana Reyes', 'Ana', 'Ana +1'])
   assert.ok(!list.some(person => person.invitationId === 4))
+})
+
+test('people: a chair shows the whole name when it fits, so "Tita Jop" and "Tita Lorns" stay apart', () => {
+  const list = people.buildPeople([
+    invitation(1, 'Tita Jop', 2), invitation(2, 'Tita Lorns'), invitation(3, 'Tita'), invitation(4, 'Tita'), invitation(5, 'Ate Gianelli'),
+    invitation(6, 'Maria Clara Santos'), invitation(7, 'Maria Lourdes Reyes'), invitation(8, 'Ben Cruz', 2, yes(2, ['Carla Cruz'])),
+  ])
+  assert.deepEqual(plain(list.map(person => person.shortName)), ['Tita Jop', 'Tita +1', 'Tita Lorns', 'Tita', 'Tita', 'Ate Gianelli', 'Maria S.', 'Maria R.', 'Ben Cruz', 'Carla Cruz'])
+  assert.ok(list.every(person => person.shortName.length <= 12))
 })
 
 test('people: keys round-trip and malformed keys are refused', () => {
