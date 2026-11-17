@@ -33,6 +33,16 @@ const MIGRATIONS = [
     },
     extraPending: database => database.rsvpEmailNullable === false,
   },
+  {
+    file: 'migrations/20261113_seating.sql',
+    sha256: 'e3b248896d7ebe729af5f95fa1c1d717eb7f1042b60e4d59d857f31d1de6cd49',
+    summary: ['new empty tables: seating_tables, seating_assignments, seating_plan'],
+    creates: {
+      tables: ['seating_tables', 'seating_assignments', 'seating_plan'],
+      columns: [],
+    },
+    extraPending: () => false,
+  },
 ]
 
 function readStatements(migration) {

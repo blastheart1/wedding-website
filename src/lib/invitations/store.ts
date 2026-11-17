@@ -3,6 +3,7 @@ import { getInviteDb, schema } from './db'
 import { parseInviteSettings, type InviteSettings } from './settings'
 import type { InvitationRecord, InviteEventType, InviteStore, RsvpRecord } from './types'
 import type { InviteRsvpValues } from './policy'
+import { findGuestSeating } from '@/lib/seating/store'
 
 const { invitations, invitationEvents, inviteSettings, rsvps, weddingConfig } = schema
 
@@ -114,6 +115,13 @@ export const inviteStore: InviteStore = {
 
   async recordEvent(invitationId, type: InviteEventType, channel = null, meta = null) {
     await getInviteDb().insert(invitationEvents).values({ invitationId, type, channel, meta })
+  },
+
+  findSeating(invitation, rsvp) {
+    return findGuestSeating({
+      invitation: { id: invitation.id, seats: invitation.seats },
+      response: rsvp && { attending: rsvp.attending, partySize: rsvp.partySize ?? (rsvp.attending ? 1 : 0), companions: rsvp.companions },
+    })
   },
 
   async deadlineText() {

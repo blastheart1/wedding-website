@@ -82,3 +82,18 @@ ALTER TABLE rsvps DROP COLUMN IF EXISTS invitation_id, DROP COLUMN IF EXISTS par
 ALTER TABLE rsvps ALTER COLUMN email SET NOT NULL;
 DROP TABLE IF EXISTS invitation_events, invitations, invite_settings, rate_limits;
 ```
+
+## Seat plan: existing database
+
+`20261113_seating.sql` creates three empty tables (`seating_tables`,
+`seating_assignments`, `seating_plan`) and two unique indexes. It reads and
+changes no existing table, column or row.
+
+Order is safe either way. Old code ignores the new tables. New code without
+them shows the guest page exactly as before and a notice in the admin seat plan.
+
+Rollback (no snapshot needed, because nothing existing is altered):
+
+```sql
+DROP TABLE IF EXISTS seating_assignments, seating_tables, seating_plan;
+```
