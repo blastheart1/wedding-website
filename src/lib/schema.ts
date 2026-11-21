@@ -57,6 +57,8 @@ export const invitations = pgTable(
     phone:           varchar('phone', { length: 32 }),
     // Seats including the guest: 1 = solo, 3 = guest plus two
     seats:           integer('seats').notNull().default(1),
+    // JSON list of the plus ones the couple named for this guest (null: just a number of seats)
+    plusOnes:        text('plus_ones'),
     // SHA-256 hex of the link token (lookup) and AES-256-GCM copy (re-display)
     tokenHash:       varchar('token_hash', { length: 64 }).notNull(),
     tokenEnc:        text('token_enc').notNull(),
@@ -245,7 +247,7 @@ export const weddingConfig = pgTable('wedding_config', {
   partner1:        varchar('partner1',        { length: 100 }).default('Luis'),
   partner2:        varchar('partner2',        { length: 100 }).default('Bee'),
   weddingDate:     varchar('wedding_date',    { length: 50  }).default('2027-02-27'),
-  ceremonyTime:    varchar('ceremony_time',   { length: 20  }).default('3:00 PM'),
+  ceremonyTime:    varchar('ceremony_time',   { length: 20  }).default('2:00 PM'),
   receptionTime:   varchar('reception_time',  { length: 20  }).default('6:00 PM'),
   ceremonyVenue:   varchar('ceremony_venue',  { length: 255 }),
   receptionVenue:  varchar('reception_venue', { length: 255 }),

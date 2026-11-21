@@ -1,6 +1,7 @@
 import { asc, desc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { getInviteDb, schema } from './db'
 import { decryptToken, issueToken } from './token'
+import { bringingPositions, parsePlusOnes, serialisePlusOnes } from './plus-ones'
 import { inviteSettingsSchema, parseInviteSettings, type InviteSettings } from './settings'
 import type { GuestInput, ShareChannel } from './admin-schemas'
 import type { InviteEventType } from './types'
@@ -14,6 +15,7 @@ const summaryColumns = {
   email: invitations.email,
   phone: invitations.phone,
   seats: invitations.seats,
+  plusOnes: invitations.plusOnes,
   status: invitations.status,
   sentAt: invitations.sentAt,
   lastChannel: invitations.lastChannel,
@@ -36,7 +38,13 @@ export interface InvitationResponse {
 }
 
 type SummaryRow = { [K in keyof typeof summaryColumns]: (typeof invitations.$inferSelect)[K] }
-export type InvitationSummary = SummaryRow & { response: InvitationResponse | null }
+export type InvitationSummary = Omit<SummaryRow, 'plusOnes'> & {
+  /** The people the couple named as this guest's plus ones (empty for an invitation with just a number of seats). */
+  plusOnes: string[]
+  response: InvitationResponse | null
+}
+
+const withPlusOnes = (row: SummaryRow) => ({ ...row, plusOnes: parsePlusOnes(row.plusOnes) })
 
 export interface InvitationDetail extends InvitationSummary {
   token: string
@@ -99,7 +107,7 @@ export async function listInvitations(): Promise<InvitationSummary[]> {
     db.select(responseColumns).from(rsvps).where(isNotNull(rsvps.invitationId)),
   ])
   const byInvitation = new Map(responses.map(row => [row.invitationId, toResponse(row)]))
-  return rows.map(row => ({ ...row, response: byInvitation.get(row.id) ?? null }))
+  return rows.map(row => ({ ...withPlusOnes(row), response: byInvitation.get(row.id) ?? null }))
 }
 
 export async function getInvitationDetail(id: number): Promise<InvitationDetail | null> {
@@ -112,14 +120,14 @@ export async function getInvitationDetail(id: number): Promise<InvitationDetail 
       .from(invitationEvents).where(eq(invitationEvents.invitationId, id)).orderBy(desc(invitationEvents.createdAt), desc(invitationEvents.id)).limit(200),
   ])
   if (!rows[0] || !tokens[0]) return null
-  return { ...rows[0], response: responses[0] ? toResponse(responses[0]) : null, token: decryptToken(tokens[0].tokenEnc), events }
+  return { ...withPlusOnes(rows[0]), response: responses[0] ? toResponse(responses[0]) : null, token: decryptToken(tokens[0].tokenEnc), events }
 }
 
 export async function createInvitation(input: GuestInput, guestListId: number | null = null): Promise<number> {
   const issued = issueToken()
   try {
     const [row] = await getInviteDb().insert(invitations).values({
-      guestName: input.guestName, email: input.email, phone: input.phone, seats: input.seats,
+      guestName: input.guestName, email: input.email, phone: input.phone, seats: input.seats, plusOnes: serialisePlusOnes(input.plusOnes),
       tokenHash: issued.tokenHash, tokenEnc: issued.tokenEnc, guestListId,
     }).returning({ id: invitations.id })
     await logEvent(row.id, 'created')
@@ -150,12 +158,34 @@ export async function createInvitations(inputs: readonly GuestInput[], guestList
   return result
 }
 
+type BatchInput = Parameters<ReturnType<typeof getInviteDb>['batch']>[0]
+
+/**
+ * Changes a guest's details. When the plus-one list changes after the guest has
+ * answered, their answer is brought in line with it in the same step: a ticked
+ * name that is no longer on the list stops counting, and the party shrinks to match.
+ */
 export async function editInvitation(id: number, input: GuestInput): Promise<boolean> {
+  const db = getInviteDb()
   try {
-    const rows = await getInviteDb().update(invitations)
-      .set({ guestName: input.guestName, email: input.email, phone: input.phone, seats: input.seats, updatedAt: new Date() })
-      .where(eq(invitations.id, id)).returning({ id: invitations.id })
-    if (!rows[0]) return false
+    const [current] = await db.select({ id: invitations.id }).from(invitations).where(eq(invitations.id, id)).limit(1)
+    if (!current) return false
+    const [answer] = await db.select({ id: rsvps.id, attending: rsvps.attending, companions: rsvps.companions, partySize: rsvps.partySize })
+      .from(rsvps).where(eq(rsvps.invitationId, id)).limit(1)
+    const now = new Date()
+    const writes: unknown[] = [
+      db.update(invitations)
+        .set({ guestName: input.guestName, email: input.email, phone: input.phone, seats: input.seats, plusOnes: serialisePlusOnes(input.plusOnes), updatedAt: now })
+        .where(eq(invitations.id, id)),
+    ]
+    if (answer?.attending && input.plusOnes.length) {
+      const listed = new Set(bringingPositions(input.plusOnes, parseCompanions(answer.companions)))
+      const companions = input.plusOnes.filter((_name, position) => listed.has(position))
+      if (companions.length + 1 !== answer.partySize || companions.length !== parseCompanions(answer.companions).length) {
+        writes.push(db.update(rsvps).set({ companions: JSON.stringify(companions), partySize: companions.length + 1, updatedAt: now }).where(eq(rsvps.id, answer.id)))
+      }
+    }
+    await db.batch(writes as unknown as BatchInput)
     await logEvent(id, 'edited')
     return true
   } catch (error) {
@@ -232,7 +262,7 @@ export async function importFromGuestList(): Promise<BulkResult> {
   const taken = new Set(existing.map(row => row.email))
   const fresh = allowed.filter(guest => !taken.has(guest.email))
   return createInvitations(
-    fresh.map(guest => ({ guestName: guest.name?.trim() || guest.email.split('@')[0], email: guest.email, phone: null, seats: guest.seats })),
+    fresh.map(guest => ({ guestName: guest.name?.trim() || guest.email.split('@')[0], email: guest.email, phone: null, seats: guest.seats, plusOnes: [] })),
     fresh.map(guest => guest.id),
   )
 }

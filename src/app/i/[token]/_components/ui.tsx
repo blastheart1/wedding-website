@@ -18,7 +18,8 @@ export function Row({ children, className }: { children: ReactNode; className?: 
 }
 
 export const inputClass =
-  'w-full rounded-xl bg-[#F5F2EE] px-4 py-3 font-sans text-[16px] text-ink placeholder:text-ink2/60 outline-none transition-shadow focus:ring-2 focus:ring-ink/25'
+  // 16 px stops iPhone Safari zooming in on focus; the bottom margin keeps a focused field clear of the send bar.
+  'min-h-[48px] w-full scroll-mb-40 rounded-xl bg-[#F5F2EE] px-4 py-3 font-sans text-[16px] text-ink placeholder:text-ink2/60 outline-none transition-shadow focus:ring-2 focus:ring-ink/25'
 
 export const labelClass = 'mb-1.5 block font-sans text-[14px] text-ink2'
 
@@ -33,7 +34,7 @@ export function PrimaryButton({ children, disabled, type = 'button', onClick }: 
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className="w-full rounded-full bg-ink px-6 py-3.5 font-sans text-[16px] font-medium text-cream transition-opacity active:opacity-80 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      className="min-h-[48px] w-full rounded-full bg-ink px-6 py-3.5 font-sans text-[16px] font-medium text-cream transition-opacity active:opacity-80 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
     >
       {children}
     </button>
@@ -45,7 +46,7 @@ export function QuietButton({ children, onClick }: { children: ReactNode; onClic
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-full bg-[#F5F2EE] px-6 py-3.5 font-sans text-[16px] font-medium text-ink transition-opacity active:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+      className="min-h-[48px] w-full rounded-full bg-[#F5F2EE] px-6 py-3.5 font-sans text-[16px] font-medium text-ink transition-opacity active:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
     >
       {children}
     </button>

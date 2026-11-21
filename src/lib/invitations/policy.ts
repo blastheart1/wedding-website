@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CLOSED_LIST_MESSAGE, choosePlusOnes } from './plus-ones'
 
 export const MAX_SEATS = 20
 
@@ -61,6 +62,8 @@ export const inviteRsvpSchema = z.object({
   dietary: optionalText(500),
   songRequest: optionalText(255),
   message: optionalText(2000),
+  // Positions of the listed plus ones who are coming, for an invitation with a named list. Checked in `checkNamedRsvp`.
+  bringing: z.unknown().optional(),
   acknowledged: z.literal(true, { errorMap: () => ({ message: 'Please confirm you have read the reminders.' }) }),
 })
 
@@ -98,6 +101,22 @@ export function checkInviteRsvp(input: InviteRsvpInput, seats: number): RsvpChec
     ok: true,
     values: { attending: true, partySize, companions: input.companions, dietary: input.dietary, songRequest: input.songRequest, message: input.message },
   }
+}
+
+/**
+ * The rules for an invitation with a named, closed list of plus ones. The guest
+ * answers yes or no and ticks who is coming; the party and the names come from
+ * the stored list, never from what the browser typed. Declining gives up every
+ * seat, and so does leaving a name unticked.
+ */
+export function checkNamedRsvp(input: InviteRsvpInput, plusOnes: readonly string[]): RsvpCheck {
+  const extras = { dietary: input.dietary, songRequest: input.songRequest, message: input.message }
+  if (input.attending === 'no') return { ok: true, values: { attending: false, partySize: 0, companions: [], ...extras } }
+  // The form never sends names for a closed list, so any that arrive are not from it.
+  if (input.companions.length > 0) return { ok: false, message: CLOSED_LIST_MESSAGE }
+  const chosen = choosePlusOnes(plusOnes, input.bringing)
+  if (!chosen.ok) return { ok: false, message: chosen.message }
+  return { ok: true, values: { attending: true, partySize: 1 + chosen.companions.length, companions: chosen.companions, ...extras } }
 }
 
 export const INVITE_UNAVAILABLE = 'This invitation link is not active. Please contact us and we will help you.'

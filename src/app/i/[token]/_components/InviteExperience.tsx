@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { InviteView } from '@/lib/invitations/types'
 import { Group, Row, QuietButton } from './ui'
 import { RsvpForm } from './RsvpForm'
@@ -16,7 +16,12 @@ export interface InviteExperienceProps {
   faqs: { id: number; question: string; answer: string }[]
 }
 
+const joinNames = (names: readonly string[]): string =>
+  names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+
 function seatsLine(view: InviteView): string {
+  // The couple's own list names who the invitation includes; otherwise it is just a number.
+  if (view.plusOnes?.length) return `Your invitation includes you and ${joinNames(view.plusOnes)}.`
   if (view.plus === 0) return 'This invitation is reserved for you.'
   return `Your invitation includes you and ${view.plus} ${view.plus === 1 ? 'guest' : 'guests'}.`
 }
@@ -24,6 +29,8 @@ function seatsLine(view: InviteView): string {
 function ResponseSummary({ view, onEdit }: { view: InviteView; onEdit: () => void }) {
   const response = view.response
   if (!response) return null
+  // On a closed list, whoever was not ticked has given up their seat.
+  const notComing = (view.plusOnes ?? []).filter((_name, position) => !(response.bringing ?? []).includes(position))
   return (
     <>
       <Group label="Your RSVP" footnote={view.canEdit
@@ -42,7 +49,13 @@ function ResponseSummary({ view, onEdit }: { view: InviteView; onEdit: () => voi
         {response.attending && response.companions.length > 0 && (
           <Row>
             <p className="font-sans text-[13px] text-ink2">Coming with you</p>
-            <p className="font-sans text-[16px] text-ink">{response.companions.join(', ')}</p>
+            <p className="break-words font-sans text-[16px] text-ink">{response.companions.join(', ')}</p>
+          </Row>
+        )}
+        {response.attending && notComing.length > 0 && (
+          <Row>
+            <p className="font-sans text-[13px] text-ink2">Not coming (these seats are released)</p>
+            <p className="break-words font-sans text-[16px] text-ink">{notComing.join(', ')}</p>
           </Row>
         )}
         {response.dietary && (
@@ -60,6 +73,10 @@ function ResponseSummary({ view, onEdit }: { view: InviteView; onEdit: () => voi
 export function InviteExperience({ token, initialView, couple, dos, donts, acknowledgement, faqs }: InviteExperienceProps) {
   const [view, setView] = useState(initialView)
   const [editing, setEditing] = useState(!initialView.response && initialView.canEdit)
+  const [saved, setSaved] = useState(false)
+  const banner = useRef<HTMLDivElement>(null)
+  // After sending, the confirmation is what the guest sees and what a screen reader announces.
+  useEffect(() => { if (saved) banner.current?.focus({ preventScroll: true }) }, [saved])
 
   // Counted only when the page runs in a real browser; link-preview robots never get here.
   useEffect(() => {
@@ -67,7 +84,7 @@ export function InviteExperience({ token, initialView, couple, dos, donts, ackno
   }, [token])
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[560px] px-4 pb-16 pt-12">
+    <main className="mx-auto min-h-screen w-full max-w-[560px] pb-[max(4rem,calc(env(safe-area-inset-bottom)+2rem))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(3rem,calc(env(safe-area-inset-top)+1.5rem))]">
       <header className="px-4 text-center">
         <p className="font-sans text-[13px] uppercase tracking-[0.14em] text-ink2">{couple.partner1} &amp; {couple.partner2}</p>
         <h1 className="mt-3 font-serif text-[40px] leading-[1.1] text-ink">Welcome, {view.firstName}</h1>
@@ -77,6 +94,12 @@ export function InviteExperience({ token, initialView, couple, dos, donts, ackno
       </header>
 
       {view.seating && <YourTable seating={view.seating} />}
+
+      {saved && view.response && (
+        <div ref={banner} role="status" tabIndex={-1} className="mt-6 rounded-2xl bg-ink px-5 py-4 text-center font-sans text-[16px] leading-snug text-cream outline-none">
+          {view.response.attending ? 'Thank you. Your RSVP is in.' : 'Thank you for letting us know.'}
+        </div>
+      )}
 
       {(dos.length > 0 || donts.length > 0) && (
         <>
@@ -112,11 +135,11 @@ export function InviteExperience({ token, initialView, couple, dos, donts, ackno
           token={token}
           view={view}
           acknowledgement={acknowledgement}
-          onSaved={next => { setView(next); setEditing(false); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+          onSaved={next => { setView(next); setEditing(false); setSaved(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
           onCancel={view.response ? () => setEditing(false) : undefined}
         />
       ) : view.response ? (
-        <ResponseSummary view={view} onEdit={() => setEditing(true)} />
+        <ResponseSummary view={view} onEdit={() => { setSaved(false); setEditing(true) }} />
       ) : (
         <Group label="Your RSVP">
           <Row><p className="font-sans text-[16px] text-ink">The RSVP deadline has passed. Please contact us and we will help you.</p></Row>
@@ -124,7 +147,7 @@ export function InviteExperience({ token, initialView, couple, dos, donts, ackno
       )}
 
       <p className="mt-10 text-center font-sans text-[14px] text-ink2">
-        <a href="/" className="underline underline-offset-4">Visit the wedding site</a>
+        <a href="/" className="inline-flex min-h-[44px] items-center underline underline-offset-4">Visit the wedding site</a>
       </p>
     </main>
   )
