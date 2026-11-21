@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { motion, useInView, AnimatePresence } from 'framer-motion'
 import { SectionBackground } from '@/components/ui/SectionBackground'
+import { SectionHeader } from '@/components/ui/SectionHeader'
 import { DEFAULT_SECTION_HEADINGS } from '@/lib/constants'
 import { fadeUp, stagger } from '@/lib/animations'
 import type { SectionHeading } from '@/types'
@@ -18,8 +19,8 @@ function ChevronIcon({ open }: { open: boolean }) {
     <motion.svg
       animate={{ rotate: open ? 180 : 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      width="16"
-      height="16"
+      width="22"
+      height="22"
       viewBox="0 0 16 16"
       fill="none"
       className="shrink-0 text-rose"
@@ -45,10 +46,10 @@ function FAQItemRow({ item, index }: { item: FAQItem; index: number }) {
     >
       <button
         onClick={() => setOpen(prev => !prev)}
-        className="w-full flex items-center justify-between gap-4 py-4 px-0 text-left group"
+        className="w-full flex items-center justify-between gap-5 py-5 px-0 text-left group min-h-[64px]"
         aria-expanded={open}
       >
-        <span className="font-sans text-[14px] text-ink leading-snug group-hover:text-rose transition-colors">
+        <span className="font-sans text-[19px] md:text-[21px] text-ink leading-snug group-hover:text-rose transition-colors">
           {item.question}
         </span>
         <ChevronIcon open={open} />
@@ -64,7 +65,7 @@ function FAQItemRow({ item, index }: { item: FAQItem; index: number }) {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="whitespace-pre-line pb-4 text-[13px] text-ink2 leading-relaxed">
+            <p className="whitespace-pre-line pb-6 max-w-[72ch] text-[17px] md:text-[18px] text-ink2 leading-relaxed">
               {item.answer}
             </p>
           </motion.div>
@@ -88,26 +89,11 @@ export function FAQSection({ heading = DEFAULT_SECTION_HEADINGS.faq, bgUrl }: FA
   }, [])
 
   return (
-    <section id="faq" className="relative py-24 px-6">
+    <section id="faq" className="relative min-h-[100svh] flex items-center py-28 px-6 max-md:px-[18px]">
       <SectionBackground imageUrl={bgUrl} fallbackColor="bg-lavender/30" />
 
-      <div className="relative z-10 max-w-2xl mx-auto">
-        {/* Section heading */}
-        <motion.div
-          ref={ref}
-          variants={stagger(0.08)}
-          initial="hidden"
-          animate={inView ? 'visible' : 'hidden'}
-          className="text-center mb-12"
-        >
-          <motion.p variants={fadeUp} className="text-[9px] tracking-[4px] uppercase text-muted mb-2">
-            {heading.eyebrow}
-          </motion.p>
-          <motion.h2 variants={fadeUp} className="font-display font-light text-[32px] text-ink">
-            {heading.heading}{' '}
-            <em className="italic text-rose">{heading.italic}</em>
-          </motion.h2>
-        </motion.div>
+      <div ref={ref} className="relative z-10 w-full max-w-[1120px] mx-auto">
+        <SectionHeader eyebrow={heading.eyebrow} heading={heading.heading} headingItalic={heading.italic} />
 
         {/* FAQ list */}
         {items.length === 0 ? (
@@ -115,7 +101,7 @@ export function FAQSection({ heading = DEFAULT_SECTION_HEADINGS.faq, bgUrl }: FA
             variants={fadeUp}
             initial="hidden"
             animate={inView ? 'visible' : 'hidden'}
-            className="text-center text-[13px] text-muted italic"
+            className="text-center text-[18px] text-muted italic"
           >
             No questions yet — check back soon.
           </motion.p>
@@ -124,7 +110,7 @@ export function FAQSection({ heading = DEFAULT_SECTION_HEADINGS.faq, bgUrl }: FA
             variants={stagger(0.07)}
             initial="hidden"
             animate={inView ? 'visible' : 'hidden'}
-            className="bg-white/80 backdrop-blur-sm border border-rule divide-y-0 px-6"
+            className="bg-white/80 backdrop-blur-sm border border-rule divide-y-0 px-6 md:px-12 shadow-[0_10px_44px_#00000017]"
           >
             {items.map((item, i) => (
               <FAQItemRow key={item.id} item={item} index={i} />
