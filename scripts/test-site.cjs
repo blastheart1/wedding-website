@@ -470,3 +470,59 @@ test('faq: fills the screen like other sections and matches the details width an
   assert.match(faq, /<SectionHeader /)
   assert.match(faq, /whitespace-pre-line/)
 })
+
+// ─── Dress code: Women and Men blocks with illustrations, and a separate "not allowed" panel ──────
+test('dress code: illustrated Women and Men blocks, the couple\'s colors, and the wording stays editable', () => {
+  const details = read('src/components/sections/Details.tsx'), css = read('src/app/globals.css')
+  const presentation = load('src/lib/presentation.ts')
+  // The approved palette is exactly the couple's two named groups.
+  for (const swatch of ["['Blush pink','#e9b8c4']", "['Lilac','#c9b7e6']", "['Sky blue','#a8cce3']", "['Mint','#b7d5c4']", "['Butter yellow','#f3df8c']",
+    "['Fuchsia','#d65397']", "['Lavender','#9470c2']", "['Cornflower','#5c8dcc']", "['Fresh green','#6fb480']", "['Sunshine','#efbd39']"]) assert.ok(details.includes(swatch), swatch)
+  assert.match(details, /const restricted=\[\['Black','#232323'\],\['White','#ffffff'\],\['Red','#c43242'\],\['Brown','#75503a'\],\['Beige','#c8b49b'\],\['Cream','#f3e7cc'\],\['Rust','#aa5d3d'\]\]/)
+  assert.match(details, /fabric-swatch-white/, 'white has a visible outline')
+  assert.match(css, /\.fabric-swatch-white\{box-shadow:inset 0 0 0 2px/)
+  // Women get two illustrations with short descriptions; Men get one that the text already describes.
+  const women = details.slice(details.indexOf('dress-outfit-women'), details.indexOf('dress-outfit-men'))
+  assert.equal((women.match(/<img /g) || []).length, 2)
+  assert.ok(women.includes('outfits.floral') && women.includes('outfits.separates'))
+  assert.ok(details.includes("floral:'/wedding/attire/floral-midi.webp'") && details.includes("separates:'/wedding/attire/pastel-separates.webp'"))
+  assert.ok(!/alt=""/.test(women), 'each women illustration has a description')
+  const men = details.slice(details.indexOf('dress-outfit-men'), details.indexOf('dress-avoid"'))
+  assert.equal((men.match(/<img /g) || []).length, 1)
+  assert.ok(men.includes('outfits.men') && details.includes("men:'/wedding/attire/mens-outfit.webp'"))
+  assert.match(men, /alt=""/, 'the text beside it already says the same')
+  assert.match(css, /\.dress-outfit-art img\{[^}]*object-fit:contain/, 'illustrations are never cropped')
+  assert.match(css, /\.dress-outfits\{[^}]*grid-template-columns:minmax\(0,1\.55fr\) minmax\(0,1fr\)/)
+  assert.match(css, /@media\(max-width:767px\)\{\.dress-outfits\{grid-template-columns:minmax\(0,1fr\)/, 'Women and Men stack on a phone')
+  assert.match(css, /\.dress-code-card\{grid-template-columns:minmax\(0,\.85fr\) minmax\(0,1\.15fr\)\}/, 'wide content can never push the card past the screen')
+  // The illustrations are small, transparent web copies.
+  for (const file of ['floral-midi', 'pastel-separates', 'mens-outfit']) {
+    const bytes = fs.statSync(path.join(root, 'public/wedding/attire', file + '.webp')).size
+    assert.ok(bytes > 20000 && bytes < 250000, file + ' is ' + bytes + ' bytes')
+  }
+  // Every piece of wording comes from settings, not from a picture.
+  assert.match(details, /presentation\.dressWomen/)
+  assert.match(details, /presentation\.dressMen/)
+  assert.match(details, /presentation\.dressRestrictions/)
+  assert.match(details, /presentation\.dressAvoidAttire/)
+  assert.match(details, /presentation\.dressChurch/)
+  const d = presentation.DEFAULT_PRESENTATION
+  assert.equal(d.dressWomen, 'Wear whatever makes you feel confident and beautiful! We love soft and pastel tones inspired by our palette. Any style or print you feel amazing in is welcome.')
+  assert.equal(d.dressMen, 'Wear a long-sleeved button-up shirt with a tie that matches our palette, dress slacks, and dress shoes.')
+  assert.equal(d.dressAvoidAttire, 'Slippers, shorts, T-shirts, mini-dresses, and caps.')
+  assert.equal(d.dressChurch, 'Please choose an outfit suitable for a church ceremony.')
+  assert.match(d.dressRestrictions, /Guests wearing these colors will not be admitted to the celebration\./)
+  assert.equal(d.dressDescription, '', 'the generic outfit paragraph is gone')
+  // Settings saved before these fields existed still load, and fall back to the new wording.
+  const old = presentation.parseSitePresentation(JSON.stringify({ dressDescription: 'Old line', footerContactEmail: '' }))
+  assert.equal(old.dressDescription, 'Old line')
+  assert.equal(old.dressMen, d.dressMen)
+  // The admin can edit each new piece.
+  const admin = read('src/app/admin/(panel)/settings/_components/PresentationGroups.tsx')
+  for (const key of ['dressWomen', 'dressMen', 'dressRestrictions', 'dressAvoidAttire', 'dressChurch']) assert.ok(admin.includes(`'${key}'`), key)
+  // The warning keeps its contrast and sits in its own panel, apart from the approved palettes.
+  assert.match(details, /<div className="dress-avoid" role="note"/)
+  assert.ok(details.indexOf('dress-palettes') < details.indexOf('dress-outfits') && details.indexOf('dress-outfits') < details.indexOf('dress-avoid'))
+  assert.match(css, /\.dress-avoid\{background:#efede8/)
+  assert.match(css, /\.dress-avoid \.dress-avoid-instruction\{font-weight:500;color:#332923/)
+})
