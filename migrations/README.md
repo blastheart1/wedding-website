@@ -97,3 +97,18 @@ Rollback (no snapshot needed, because nothing existing is altered):
 ```sql
 DROP TABLE IF EXISTS seating_assignments, seating_tables, seating_plan;
 ```
+
+## Named plus ones: existing database
+
+`20261121_plus_ones.sql` adds one nullable text column, `invitations.plus_ones`
+(a JSON list of names), and nothing else. It reads and changes no row.
+
+**Order matters: apply it before deploying the code that uses it.** The guest page
+selects the column, so new code against an unmigrated database cannot find an
+invitation. The reverse is safe: old code ignores the column.
+
+Rollback:
+
+```sql
+ALTER TABLE invitations DROP COLUMN IF EXISTS plus_ones;
+```

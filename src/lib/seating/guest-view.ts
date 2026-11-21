@@ -1,3 +1,4 @@
+import { bringingPositions } from '@/lib/invitations/plus-ones'
 import type { Assignment, SeatingTable, TableShape } from './rules'
 import type { SeatingPlan } from './schemas'
 
@@ -38,14 +39,16 @@ export interface GuestSeatingInput {
   tables: readonly SeatingTable[]
   /** Only this invitation's assignments. */
   assignments: readonly Assignment[]
-  invitation: { id: number; seats: number }
+  invitation: { id: number; seats: number; plusOnes?: string[] }
   response: { attending: boolean; partySize: number; companions: string[] } | null
 }
 
 const COUNT_WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 
-function whoIs(index: number, plusOnes: number, companions: readonly string[]): string {
+function whoIs(index: number, plusOnes: number, companions: readonly string[], listed: readonly string[]): string {
   if (index === 0) return 'You'
+  // A plus one the couple named is called by name, ticked or not yet.
+  if (listed[index - 1]) return listed[index - 1]
   const named = companions[index - 1]?.trim()
   if (named) return named
   return plusOnes === 1 ? 'Your plus one' : `Your plus ${COUNT_WORDS[index - 1] ?? index}`
@@ -55,18 +58,25 @@ export function buildGuestSeating(input: GuestSeatingInput): GuestSeating | null
   const { plan, tables, invitation, response } = input
   if (!plan.published) return null
   if (response && !response.attending) return null
-  // Before a reply everyone on the invitation may come; after it, only the confirmed party.
+  const listed = invitation.plusOnes ?? []
+  // Who is coming. With a named list it is the people ticked; before a reply, everyone on the invitation;
+  // with just a number of seats, the first few.
   const partySize = response ? response.partySize : invitation.seats
+  const coming = (index: number): boolean => {
+    if (!listed.length) return index < Math.min(partySize, invitation.seats)
+    if (!response || index === 0) return index <= listed.length
+    return bringingPositions(listed, response.companions).includes(index - 1)
+  }
   const tableById = new Map(tables.map(table => [table.id, table]))
   const seated = input.assignments
-    .filter(assignment => assignment.invitationId === invitation.id && assignment.index < Math.min(partySize, invitation.seats) && tableById.has(assignment.tableId))
+    .filter(assignment => assignment.invitationId === invitation.id && coming(assignment.index) && tableById.has(assignment.tableId))
     .sort((a, b) => a.index - b.index)
   if (!seated.length) return null
   const mine = new Set(seated.map(assignment => assignment.tableId))
   const plusOnes = Math.max(0, partySize - 1)
   return {
     seats: seated.map(assignment => ({
-      who: whoIs(assignment.index, plusOnes, response?.companions ?? []),
+      who: whoIs(assignment.index, plusOnes, response?.companions ?? [], listed),
       table: tableById.get(assignment.tableId)?.label ?? '',
     })),
     map: {

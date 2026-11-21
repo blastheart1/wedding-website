@@ -1,3 +1,5 @@
+import { bringingPositions } from '@/lib/invitations/plus-ones'
+
 /**
  * The list of people to seat. Nobody is stored separately for seating: every
  * entry is worked out from an invitation (how many seats it holds) and its RSVP
@@ -9,6 +11,8 @@ export interface SeatingInvitation {
   guestName: string
   /** Seats including the invited guest: 1 = solo, 3 = guest plus two. */
   seats: number
+  /** The people the couple named as this guest's plus ones. Absent or empty for an invitation with just a number of seats. */
+  plusOnes?: string[]
   status: string
   response: { attending: boolean; partySize: number; companions: string[] } | null
 }
@@ -57,6 +61,9 @@ function attendanceOf(invitation: SeatingInvitation, index: number): Attendance 
   const response = invitation.response
   if (!response) return 'pending'
   if (!response.attending) return 'declined'
+  const named = invitation.plusOnes ?? []
+  // With a named list, a plus one is coming only if the guest ticked them; with a number of seats, the first few are.
+  if (named.length) return index === 0 || bringingPositions(named, response.companions).includes(index - 1) ? 'coming' : 'not_coming'
   return index < response.partySize ? 'coming' : 'not_coming'
 }
 
@@ -66,8 +73,10 @@ function personOf(invitation: SeatingInvitation, index: number): Person {
     return { ...base, name: invitation.guestName.trim(), shortName: chairName(invitation.guestName), hostName: null }
   }
   const label = plusOneLabel(invitation.guestName, index)
-  // The guest names who they bring when they RSVP; until then the plus one is known only by its host.
-  const named = invitation.response?.attending ? invitation.response.companions[index - 1]?.trim() : ''
+  // The couple's own list names the plus ones. Without one, the guest names who they bring when they RSVP,
+  // and until then the plus one is known only by its host.
+  const listed = invitation.plusOnes?.[index - 1]
+  const named = listed ?? (invitation.response?.attending ? invitation.response.companions[index - 1]?.trim() : '')
   return {
     ...base,
     name: named ? `${named} · ${label}` : label,
@@ -95,7 +104,7 @@ function distinctShortNames(people: readonly Person[]): Person[] {
 export function buildPeople(invitations: readonly SeatingInvitation[]): Person[] {
   const people = invitations
     .filter(invitation => invitation.status === 'active')
-    .flatMap(invitation => Array.from({ length: Math.max(1, invitation.seats) }, (_unused, index) => personOf(invitation, index)))
+    .flatMap(invitation => Array.from({ length: Math.max(1, invitation.plusOnes?.length ? invitation.plusOnes.length + 1 : invitation.seats) }, (_unused, index) => personOf(invitation, index)))
   return distinctShortNames(people)
 }
 

@@ -10,8 +10,8 @@ interface FindStatusProps {
   deadline: string
 }
 
-const fieldClass = 'w-full rounded-xl bg-white px-4 py-3.5 font-sans text-[16px] text-ink outline-none transition-shadow focus:ring-2 focus:ring-ink/25'
-const buttonClass = 'w-full rounded-full bg-ink px-6 py-3.5 font-sans text-[16px] font-medium text-cream transition-opacity active:opacity-80 disabled:opacity-50'
+const fieldClass = 'min-h-[48px] w-full rounded-xl bg-white px-4 py-3.5 font-sans text-[16px] text-ink outline-none transition-shadow focus:ring-2 focus:ring-ink/25'
+const buttonClass = 'min-h-[48px] w-full rounded-full bg-ink px-6 py-3.5 font-sans text-[16px] font-medium text-cream transition-opacity active:opacity-80 disabled:opacity-50'
 
 export function FindStatus({ couple, contactEmail, deadline }: FindStatusProps) {
   const status = useStatusCheck()
@@ -31,9 +31,9 @@ export function FindStatus({ couple, contactEmail, deadline }: FindStatusProps) 
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[520px] flex-col justify-center px-6 py-16">
+    <main className="mx-auto flex min-h-screen w-full max-w-[520px] flex-col justify-center pb-[max(4rem,calc(env(safe-area-inset-bottom)+2rem))] pl-[max(1.5rem,env(safe-area-inset-left))] pr-[max(1.5rem,env(safe-area-inset-right))] pt-[max(4rem,calc(env(safe-area-inset-top)+2rem))]">
       <p className="text-center font-sans text-[13px] uppercase tracking-[0.14em] text-ink2">{couple.partner1} &amp; {couple.partner2}</p>
-      <h1 className="mt-3 text-center font-serif text-[36px] leading-tight text-ink">Check your RSVP</h1>
+      <h1 className="mt-3 text-center font-serif text-[clamp(30px,9vw,36px)] leading-tight text-ink">Check your RSVP</h1>
       <p className="mt-3 text-center font-sans text-[16px] leading-relaxed text-ink2">
         Enter the email address or mobile number we have for you. It has to match exactly.
       </p>

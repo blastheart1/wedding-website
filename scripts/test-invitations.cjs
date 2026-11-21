@@ -201,7 +201,7 @@ test('migration: offline plan lists every file in order and applies nothing', ()
   assert.equal(result.status, 0, result.stderr)
   const plan = JSON.parse(result.stdout)
   assert.equal(plan.applied, false)
-  assert.deepEqual(plan.migrations.map(item => item.file), ['migrations/20261111_site_presentation.sql', 'migrations/20261112_invitations.sql', 'migrations/20261113_seating.sql'])
+  assert.deepEqual(plan.migrations.map(item => item.file), ['migrations/20261111_site_presentation.sql', 'migrations/20261112_invitations.sql', 'migrations/20261113_seating.sql', 'migrations/20261121_plus_ones.sql'])
   const statements = plan.migrations[1].statements
   assert.ok(statements.every(sql => /^(CREATE (TABLE|UNIQUE INDEX|INDEX) IF NOT EXISTS |ALTER TABLE rsvps (ADD COLUMN IF NOT EXISTS |ALTER COLUMN email DROP NOT NULL))/.test(sql)), 'only idempotent additive statements')
   assert.ok(!statements.some(sql => /\b(DROP TABLE|DROP COLUMN|DELETE FROM|UPDATE [a-z_]+ SET|TRUNCATE|INSERT INTO)\b/i.test(sql)))
@@ -217,7 +217,8 @@ test('migration: apply without a target host, unknown flags and unknown files ar
 })
 
 test('migration: schema.ts and the SQL file describe the same new columns', () => {
-  const sql = fs.readFileSync(path.join(root, 'migrations/20261112_invitations.sql'), 'utf8')
+  // Columns added to these tables by later migrations are described by those files, so all of them are read.
+  const sql = ['20261112_invitations.sql', '20261121_plus_ones.sql'].map(file => fs.readFileSync(path.join(root, 'migrations', file), 'utf8')).join('\n')
   const schema = fs.readFileSync(path.join(root, 'src/lib/schema.ts'), 'utf8')
   const section = (source, start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)))
   const declared = [...section(schema, "'invitations',", '// Shared (cross-instance)').matchAll(/\('([a-z_]+)'/g)].map(match => match[1])
@@ -238,7 +239,7 @@ function memoryStore(options = {}) {
   const token = tokenLib.generateToken()
   const state = {
     token, lookups: 0, writes: 0, events: [], opens: 0, rsvp: null, deadline: 'January 27, 2027',
-    invitation: { id: 7, guestName: 'Maria Clara Santos', email: null, seats: 3, status: 'active', tokenHash: tokenLib.hashToken(token),
+    invitation: { id: 7, guestName: 'Maria Clara Santos', email: null, seats: 3, plusOnes: [], status: 'active', tokenHash: tokenLib.hashToken(token),
       firstOpenedAt: null, lastOpenedAt: null, respondedAt: null },
     ...options,
   }
@@ -432,8 +433,8 @@ const adminSchemas = load('src/lib/invitations/admin-schemas.ts')
 
 test('admin: a guest is stored with normalised contacts and seats', () => {
   const guest = adminSchemas.guestInputSchema.parse({ guestName: '  Maria Santos ', email: ' Maria@Example.com', phone: '0917 123 4567', seats: 3 })
-  assert.deepEqual(plain(guest), { guestName: 'Maria Santos', email: 'maria@example.com', phone: '+639171234567', seats: 3 })
-  assert.deepEqual(plain(adminSchemas.guestInputSchema.parse({ guestName: 'Jo Cruz', email: '', phone: '  ' })), { guestName: 'Jo Cruz', email: null, phone: null, seats: 1 })
+  assert.deepEqual(plain(guest), { guestName: 'Maria Santos', email: 'maria@example.com', phone: '+639171234567', seats: 3, plusOnes: [] })
+  assert.deepEqual(plain(adminSchemas.guestInputSchema.parse({ guestName: 'Jo Cruz', email: '', phone: '  ' })), { guestName: 'Jo Cruz', email: null, phone: null, seats: 1, plusOnes: [] })
 })
 
 test('admin: bad names, contacts and seat counts are rejected with a clear message', () => {
@@ -468,10 +469,10 @@ test('admin: pasted lists become guests, with plus counts and per-line errors', 
     'Bad Mail, nope@',
   ].join('\n'))
   assert.deepEqual(plain(guests), [
-    { guestName: 'Maria Santos', email: 'maria@example.com', phone: null, seats: 3 },
-    { guestName: 'Jose Rizal', email: null, phone: '+639171234567', seats: 1 },
-    { guestName: 'Ana Cruz', email: null, phone: null, seats: 2 },
-    { guestName: 'Pedro Penduko', email: 'pedro@example.com', phone: '+639181234567', seats: 2 },
+    { guestName: 'Maria Santos', email: 'maria@example.com', phone: null, seats: 3, plusOnes: [] },
+    { guestName: 'Jose Rizal', email: null, phone: '+639171234567', seats: 1, plusOnes: [] },
+    { guestName: 'Ana Cruz', email: null, phone: null, seats: 2, plusOnes: [] },
+    { guestName: 'Pedro Penduko', email: 'pedro@example.com', phone: '+639181234567', seats: 2, plusOnes: [] },
   ])
   assert.deepEqual(plain(errors.map(issue => issue.line)), [6, 7, 8])
   assert.match(errors[1].message, /more than once/)

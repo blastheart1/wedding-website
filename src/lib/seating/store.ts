@@ -1,5 +1,6 @@
 import { and, asc, eq, isNotNull, or } from 'drizzle-orm'
 import { getInviteDb, schema } from '@/lib/invitations/db'
+import { parsePlusOnes } from '@/lib/invitations/plus-ones'
 import { SeatingError } from './errors'
 import { buildGuestSeating, type GuestSeating } from './guest-view'
 import type { SeatingInvitation } from './people'
@@ -66,7 +67,7 @@ async function loadPlan(): Promise<SeatingPlan> {
 async function listSeatingInvitations(): Promise<SeatingInvitation[]> {
   const db = getInviteDb()
   const [rows, responses] = await Promise.all([
-    db.select({ id: invitations.id, guestName: invitations.guestName, seats: invitations.seats, status: invitations.status })
+    db.select({ id: invitations.id, guestName: invitations.guestName, seats: invitations.seats, plusOnes: invitations.plusOnes, status: invitations.status })
       .from(invitations).orderBy(asc(invitations.guestName), asc(invitations.id)),
     db.select({ invitationId: rsvps.invitationId, attending: rsvps.attending, partySize: rsvps.partySize, companions: rsvps.companions })
       .from(rsvps).where(isNotNull(rsvps.invitationId)),
@@ -76,7 +77,7 @@ async function listSeatingInvitations(): Promise<SeatingInvitation[]> {
     partySize: row.partySize ?? (row.attending ? 1 : 0),
     companions: parseCompanions(row.companions),
   }]))
-  return rows.map(row => ({ ...row, response: byInvitation.get(row.id) ?? null }))
+  return rows.map(row => ({ ...row, plusOnes: parsePlusOnes(row.plusOnes), response: byInvitation.get(row.id) ?? null }))
 }
 
 export async function loadSeating(): Promise<SeatingData> {
@@ -167,7 +168,7 @@ export async function savePlan(input: unknown): Promise<SeatingPlan> {
 }
 
 export interface GuestSeatingRequest {
-  invitation: { id: number; seats: number }
+  invitation: { id: number; seats: number; plusOnes?: string[] }
   response: { attending: boolean; partySize: number; companions: string[] } | null
 }
 

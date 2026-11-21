@@ -43,6 +43,13 @@ const MIGRATIONS = [
     },
     extraPending: () => false,
   },
+  {
+    file: 'migrations/20261121_plus_ones.sql',
+    sha256: 'f2540f655a2f9834f71d6965c38a177478ff8551b4c982efaa631106fdfdb095',
+    summary: ['invitations.plus_ones TEXT NULL'],
+    creates: { tables: [], columns: ['invitations.plus_ones'] },
+    extraPending: () => false,
+  },
 ]
 
 function readStatements(migration) {

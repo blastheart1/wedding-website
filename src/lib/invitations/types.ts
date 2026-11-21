@@ -7,6 +7,8 @@ export interface InvitationRecord {
   guestName: string
   email: string | null
   seats: number
+  /** The people the couple named as this guest's plus ones. Empty when the invitation just has a number of seats. */
+  plusOnes: string[]
   status: string
   tokenHash: string
   firstOpenedAt: Date | null
@@ -50,12 +52,16 @@ export interface InviteView {
   guestName: string
   seats: number
   plus: number
+  /** Present only for an invitation with a named, closed list of plus ones. */
+  plusOnes?: string[]
   canEdit: boolean
   deadline: string
   response: {
     attending: boolean
     partySize: number
     companions: string[]
+    /** Positions in `plusOnes` of the people coming. Present only with a named list. */
+    bringing?: number[]
     dietary: string
     songRequest: string
     message: string

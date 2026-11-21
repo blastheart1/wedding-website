@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { errorMessage, invitationsApi, type InvitationDetail, type ShareChannel, type UpdateAction } from './api'
 import { channelLabel, eventLabel, formatWhen, smsLink, statusText } from './status'
 import { Button, ConfirmButton, Field, Group, Row, Sheet, inputClass, labelClass } from '@/app/admin/_ui/primitives'
+import { bringingPositions } from '@/lib/invitations/plus-ones'
+import { PlusOnesField } from './PlusOnesField'
 
 interface DetailSheetProps {
   id: number
@@ -37,6 +39,8 @@ export function DetailSheet({ id, emailEnabled, emailSimulated, onClose, onChang
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [plusOnes, setPlusOnes] = useState<string[]>([])
+  const [typedName, setTypedName] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -76,6 +80,7 @@ export function DetailSheet({ id, emailEnabled, emailSimulated, onClose, onChang
 
   const { invitation, link, qrSvg, shareMessage, preview } = detail
   const active = invitation.status === 'active'
+  const seatsNow = invitation.seats
   const markSent = (channel: ShareChannel) => update({ action: 'shared', id, channel }, `Marked as sent via ${channelLabel(channel)}`)
 
   const share = async () => {
@@ -91,7 +96,8 @@ export function DetailSheet({ id, emailEnabled, emailSimulated, onClose, onChang
     event.preventDefault()
     const form = new FormData(event.currentTarget)
     const text = (name: string) => String(form.get(name) ?? '')
-    await update({ action: 'edit', id, guestName: text('guestName'), email: text('email'), phone: text('phone'), seats: Number(text('plus')) + 1 }, 'Saved')
+    // With names, the seats follow the list; with none, the guest keeps whatever number of unnamed seats they had.
+    await update({ action: 'edit', id, guestName: text('guestName'), email: text('email'), phone: text('phone'), seats: plusOnes.length ? plusOnes.length + 1 : seatsNow, plusOnes }, 'Saved')
     setEditing(false)
   }
 
@@ -158,10 +164,15 @@ export function DetailSheet({ id, emailEnabled, emailSimulated, onClose, onChang
       {editing ? (
         <form onSubmit={saveEdit}>
           <Group label="Guest">
-            <Row><label className={labelClass} htmlFor="edit-name">Name</label><input id="edit-name" name="guestName" className={inputClass} defaultValue={invitation.guestName} maxLength={255} required /></Row>
+            <Row><label className={labelClass} htmlFor="edit-name">Name</label><input id="edit-name" name="guestName" className={inputClass} defaultValue={invitation.guestName} maxLength={255} required onChange={event => setTypedName(event.target.value)} /></Row>
             <Row><label className={labelClass} htmlFor="edit-email">Email (optional)</label><input id="edit-email" name="email" type="email" className={inputClass} defaultValue={invitation.email ?? ''} maxLength={255} /></Row>
             <Row><label className={labelClass} htmlFor="edit-phone">Phone (optional)</label><input id="edit-phone" name="phone" type="tel" className={inputClass} defaultValue={invitation.phone ?? ''} maxLength={40} /></Row>
-            <Row><label className={labelClass} htmlFor="edit-plus">Plus (extra guests they may bring)</label><input id="edit-plus" name="plus" type="number" min={0} max={19} className={inputClass} defaultValue={invitation.seats - 1} required /></Row>
+            <Row>
+              <PlusOnesField names={plusOnes} onChange={setPlusOnes} guestName={typedName} />
+              {!invitation.plusOnes.length && seatsNow > 1 && plusOnes.length === 0 && (
+                <p className="mt-2 text-[13px] leading-snug text-black/55">This guest has {seatsNow - 1} unnamed extra {seatsNow === 2 ? 'seat' : 'seats'}. Add names above to replace them with a closed list.</p>
+              )}
+            </Row>
           </Group>
           <div className="mt-4 flex gap-2"><Button type="submit" tone="primary" disabled={busy}>Save</Button><Button onClick={() => setEditing(false)}>Cancel</Button></div>
         </form>
@@ -170,10 +181,20 @@ export function DetailSheet({ id, emailEnabled, emailSimulated, onClose, onChang
           <Field label="Status" value={statusText(invitation)} />
           <Field label="Email" value={invitation.email ?? 'None'} />
           <Field label="Phone" value={invitation.phone ?? 'None'} />
-          <Field label="Plus" value={invitation.seats - 1} />
+          {invitation.plusOnes.length ? null : <Field label="Plus" value={invitation.seats - 1} />}
           <Field label="Sent" value={invitation.sentAt ? `${formatWhen(invitation.sentAt)} · ${channelLabel(invitation.lastChannel)}` : 'Not yet'} />
           <Field label="Opened" value={invitation.firstOpenedAt ? `${formatWhen(invitation.firstOpenedAt)} · ${invitation.openCount} ${invitation.openCount === 1 ? 'visit' : 'visits'}` : 'Not yet'} />
-          <Row><Button onClick={() => setEditing(true)}>Edit details</Button></Row>
+          <Row><Button onClick={() => { setPlusOnes(invitation.plusOnes); setTypedName(invitation.guestName); setEditing(true) }}>Edit details</Button></Row>
+        </Group>
+      )}
+
+      {!editing && invitation.plusOnes.length > 0 && (
+        <Group label="Plus ones" footnote="A closed list: the guest ticks who is coming. Anyone left unticked gives up their seat.">
+          {invitation.plusOnes.map((name, position) => {
+            const answer = invitation.response
+            const coming = answer?.attending && bringingPositions(invitation.plusOnes, answer.companions).includes(position)
+            return <Field key={name} label={name} value={!answer ? 'No reply yet' : coming ? 'Coming' : 'Not coming'} />
+          })}
         </Group>
       )}
 

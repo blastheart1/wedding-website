@@ -1,7 +1,8 @@
 import { timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { hashToken, isTokenShape } from './token'
-import { checkInviteRsvp, DEADLINE_PASSED, firstName, INVITE_UNAVAILABLE, inviteRsvpSchema, isPastDeadline, plusCount } from './policy'
+import { bringingPositions } from './plus-ones'
+import { checkInviteRsvp, checkNamedRsvp, DEADLINE_PASSED, firstName, INVITE_UNAVAILABLE, inviteRsvpSchema, isPastDeadline, plusCount } from './policy'
 import type { InvitationRecord, InviteStore, InviteView, RsvpRecord, ServiceResult } from './types'
 
 /** A repeat visit inside this window updates the counters but adds no new timeline entry. */
@@ -30,17 +31,21 @@ export async function resolveInvitation(store: InviteStore, token: unknown): Pro
 }
 
 export function toInviteView(invitation: InvitationRecord, rsvp: RsvpRecord | null, deadline: string | null, now: number): InviteView {
+  const named = invitation.plusOnes.length > 0
   return {
     firstName: firstName(invitation.guestName),
     guestName: invitation.guestName,
     seats: invitation.seats,
-    plus: plusCount(invitation.seats),
+    plus: named ? invitation.plusOnes.length : plusCount(invitation.seats),
+    // Only an invitation with a named list carries it, so every other guest's page is exactly what it was.
+    ...(named ? { plusOnes: invitation.plusOnes } : {}),
     canEdit: !isPastDeadline(deadline, now),
     deadline: deadline ?? '',
     response: rsvp && {
       attending: rsvp.attending,
       partySize: rsvp.partySize ?? (rsvp.attending ? 1 : 0),
       companions: rsvp.companions,
+      ...(named ? { bringing: bringingPositions(invitation.plusOnes, rsvp.companions) } : {}),
       dietary: rsvp.dietary ?? '',
       songRequest: rsvp.songRequest ?? '',
       message: rsvp.message ?? '',
@@ -81,7 +86,7 @@ export async function submitInviteRsvp(store: InviteStore, token: unknown, paylo
     return { status: 400, body: { success: false, error: message } }
   }
   // Seats come from the stored invitation, never from the request.
-  const checked = checkInviteRsvp(parsed.data, invitation.seats)
+  const checked = invitation.plusOnes.length ? checkNamedRsvp(parsed.data, invitation.plusOnes) : checkInviteRsvp(parsed.data, invitation.seats)
   if (!checked.ok) return { status: 400, body: { success: false, error: checked.message } }
 
   const existing = await store.findRsvp(invitation)

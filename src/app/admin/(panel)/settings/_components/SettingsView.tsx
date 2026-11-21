@@ -37,7 +37,7 @@ export function SettingsView() {
             </Group>
             <Group label="Date and times" footnote="The RSVP deadline is enforced: after that day guests can view their answer but not change it.">
               {text('weddingDate', 'Date (YYYY-MM-DD)', '2027-02-27')}
-              {text('ceremonyTime', 'Ceremony time', '3:00 PM')}
+              {text('ceremonyTime', 'Ceremony time', '2:00 PM')}
               {text('receptionTime', 'Reception time', '6:00 PM')}
               {text('rsvpDeadline', 'RSVP deadline', 'January 27, 2027')}
             </Group>

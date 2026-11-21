@@ -411,7 +411,7 @@ test('invitation: the guest view carries the table when there is one, and surviv
   const service = load('src/lib/invitations/service.ts', {}, cache, { INVITE_TOKEN_KEY: KEY })
   const tokens = load('src/lib/invitations/token.ts', {}, cache, { INVITE_TOKEN_KEY: KEY })
   const token = tokens.generateToken()
-  const record = { id: 5, guestName: 'Jazzer Santos', email: null, seats: 2, status: 'active', tokenHash: tokens.hashToken(token), firstOpenedAt: null, lastOpenedAt: null, respondedAt: null }
+  const record = { id: 5, guestName: 'Jazzer Santos', email: null, seats: 2, plusOnes: [], status: 'active', tokenHash: tokens.hashToken(token), firstOpenedAt: null, lastOpenedAt: null, respondedAt: null }
   const base = { findByTokenHash: async () => ({ ...record }), findRsvp: async () => null, deadlineText: async () => null }
   const seating = guest.buildGuestSeating(guestInput({ response: null }))
   assert.deepEqual(plain((await service.loadInviteView({ ...base, findSeating: async () => seating }, token)).seating.seats.map(item => item.table)), ['Table 7', 'Table 7'])

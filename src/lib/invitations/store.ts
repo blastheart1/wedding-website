@@ -3,6 +3,7 @@ import { getInviteDb, schema } from './db'
 import { parseInviteSettings, type InviteSettings } from './settings'
 import type { InvitationRecord, InviteEventType, InviteStore, RsvpRecord } from './types'
 import type { InviteRsvpValues } from './policy'
+import { parsePlusOnes } from './plus-ones'
 import { findGuestSeating } from '@/lib/seating/store'
 
 const { invitations, invitationEvents, inviteSettings, rsvps, weddingConfig } = schema
@@ -12,6 +13,7 @@ const invitationColumns = {
   guestName: invitations.guestName,
   email: invitations.email,
   seats: invitations.seats,
+  plusOnesRaw: invitations.plusOnes,
   status: invitations.status,
   tokenHash: invitations.tokenHash,
   firstOpenedAt: invitations.firstOpenedAt,
@@ -78,7 +80,9 @@ async function findRsvp(invitation: InvitationRecord): Promise<RsvpRecord | null
 export const inviteStore: InviteStore = {
   async findByTokenHash(tokenHash) {
     const rows = await getInviteDb().select(invitationColumns).from(invitations).where(eq(invitations.tokenHash, tokenHash)).limit(1)
-    return rows[0] ?? null
+    if (!rows[0]) return null
+    const { plusOnesRaw, ...rest } = rows[0]
+    return { ...rest, plusOnes: parsePlusOnes(plusOnesRaw) }
   },
 
   findRsvp,
@@ -119,7 +123,7 @@ export const inviteStore: InviteStore = {
 
   findSeating(invitation, rsvp) {
     return findGuestSeating({
-      invitation: { id: invitation.id, seats: invitation.seats },
+      invitation: { id: invitation.id, seats: invitation.seats, plusOnes: invitation.plusOnes },
       response: rsvp && { attending: rsvp.attending, partySize: rsvp.partySize ?? (rsvp.attending ? 1 : 0), companions: rsvp.companions },
     })
   },

@@ -16,6 +16,8 @@ export interface InvitationSummary {
   email: string | null
   phone: string | null
   seats: number
+  /** The people the couple named as this guest's plus ones (empty for an invitation with just a number of seats). */
+  plusOnes: string[]
   status: string
   sentAt: string | null
   lastChannel: string | null
@@ -75,6 +77,7 @@ export interface GuestDraft {
   email: string
   phone: string
   seats: number
+  plusOnes: string[]
 }
 
 export type ShareChannel = 'messenger' | 'instagram' | 'sms' | 'email' | 'other'

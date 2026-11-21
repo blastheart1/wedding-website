@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { parseBulkLines } from '@/lib/invitations/admin-schemas'
 import { errorMessage, invitationsApi, type BulkResult } from './api'
 import { Button, ConfirmButton, Group, Row, Segmented, Sheet, inputClass, labelClass } from '@/app/admin/_ui/primitives'
+import { PlusOnesField } from './PlusOnesField'
 
 type Mode = 'one' | 'many'
 
@@ -20,6 +21,8 @@ export function AddGuestsSheet({ onClose, onChanged }: { onClose: () => void; on
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [list, setList] = useState('')
+  const [plusOnes, setPlusOnes] = useState<string[]>([])
+  const [typedName, setTypedName] = useState('')
   const parsed = parseBulkLines(list)
 
   const finish = (message: string) => { toast.success(message); onChanged(); onClose() }
@@ -35,13 +38,13 @@ export function AddGuestsSheet({ onClose, onChanged }: { onClose: () => void; on
     const form = new FormData(event.currentTarget)
     const text = (name: string) => String(form.get(name) ?? '')
     guard(async () => {
-      await invitationsApi.create({ guestName: text('guestName'), email: text('email'), phone: text('phone'), seats: Number(text('plus') || 0) + 1 })
+      await invitationsApi.create({ guestName: text('guestName'), email: text('email'), phone: text('phone'), seats: plusOnes.length + 1, plusOnes })
       finish('Guest added')
     })
   }
 
   const addMany = () => guard(async () => {
-    const guests = parsed.guests.map(guest => ({ guestName: guest.guestName, email: guest.email ?? '', phone: guest.phone ?? '', seats: guest.seats }))
+    const guests = parsed.guests.map(guest => ({ guestName: guest.guestName, email: guest.email ?? '', phone: guest.phone ?? '', seats: guest.seats, plusOnes: guest.plusOnes }))
     finish(summarise(await invitationsApi.createMany(guests)))
   })
 
@@ -52,17 +55,17 @@ export function AddGuestsSheet({ onClose, onChanged }: { onClose: () => void; on
       {mode === 'one' ? (
         <form onSubmit={addOne}>
           <Group footnote="Email and phone are optional. They let the guest find their status if they lose the link, and email lets you send the invitation from here.">
-            <Row><label className={labelClass} htmlFor="add-name">Name</label><input id="add-name" name="guestName" className={inputClass} maxLength={255} required autoFocus /></Row>
+            <Row><label className={labelClass} htmlFor="add-name">Name</label><input id="add-name" name="guestName" className={inputClass} maxLength={255} required autoFocus value={typedName} onChange={event => setTypedName(event.target.value)} /></Row>
             <Row><label className={labelClass} htmlFor="add-email">Email (optional)</label><input id="add-email" name="email" type="email" className={inputClass} maxLength={255} /></Row>
             <Row><label className={labelClass} htmlFor="add-phone">Phone (optional)</label><input id="add-phone" name="phone" type="tel" className={inputClass} maxLength={40} placeholder="0917 123 4567" /></Row>
-            <Row><label className={labelClass} htmlFor="add-plus">Plus (extra guests they may bring)</label><input id="add-plus" name="plus" type="number" min={0} max={19} defaultValue={0} className={inputClass} /></Row>
+            <Row><PlusOnesField names={plusOnes} onChange={setPlusOnes} guestName={typedName} /></Row>
           </Group>
           <p role="alert" className="min-h-[1.25rem] px-4 pt-2 text-[13px] text-[#B3261E]">{error}</p>
           <Button type="submit" tone="primary" disabled={busy} className="mt-2 w-full">Add guest</Button>
         </form>
       ) : (
         <>
-          <Group footnote="One guest per line: Name, email or phone, plus. Only the name is required. Example: Maria Santos, maria@example.com, 2">
+          <Group footnote={<>One guest per line, only the name is required. Naming the plus ones: <span className="whitespace-nowrap">Name | email or phone | 2: Plus One, Plus One</span> (the contact and the 2: can be left out). Or with a number of unnamed seats: Name, email or phone, 2.</>}>
             <Row>
               <label className={labelClass} htmlFor="add-list">Guest list</label>
               <textarea id="add-list" rows={8} className={`${inputClass} resize-none`} value={list} onChange={event => setList(event.target.value)} />

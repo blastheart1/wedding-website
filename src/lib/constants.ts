@@ -5,7 +5,7 @@ export const DEFAULT_CONFIG = {
   partner1:       'Luis',
   partner2:       'Bee',
   weddingDate:    '2027-02-27',
-  ceremonyTime:   '3:00 PM',
+  ceremonyTime:   '2:00 PM',
   receptionTime:  '6:00 PM',
   ceremonyVenue:  'TBA',
   receptionVenue: 'TBA',
