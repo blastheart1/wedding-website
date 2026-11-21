@@ -445,3 +445,28 @@ test('grind game: the sweet spot is hidden, varies per visit, and can always be 
   assert.match(game, />Done<\/button>/, 'Done moves on to brewing')
   assert.ok(!EMOJI.test(game))
 })
+
+// ─── FAQ: full-height section and instant jumps past pinned sections ──────────
+const anchors = load('src/lib/section-anchors.ts')
+
+test('anchors: a jump that passes a pinned section is detected, one that does not is left smooth', () => {
+  const pinned = [{ top: 3000, bottom: 5000 }, { top: 5000, bottom: 9000 }]
+  assert.equal(anchors.crossesPinnedSection(0, 9500, pinned), true)
+  assert.equal(anchors.crossesPinnedSection(9500, 0, pinned), true)
+  assert.equal(anchors.crossesPinnedSection(0, 2900, pinned), false)
+  assert.equal(anchors.crossesPinnedSection(9100, 9800, pinned), false)
+  assert.equal(anchors.crossesPinnedSection(0, 9500, []), false)
+})
+
+test('anchors: the navbar uses the instant jump on desktop and mobile links', () => {
+  const navbar = read('src/components/sections/Navbar.tsx')
+  assert.equal((navbar.match(/jumpPastPinnedSections\(event\)/g) || []).length, 2)
+})
+
+test('faq: fills the screen like other sections and matches the details width and header', () => {
+  const faq = read('src/components/sections/FAQSection.tsx')
+  assert.match(faq, /id="faq"[^>]*min-h-\[100svh\]/)
+  assert.match(faq, /max-w-\[1120px\]/)
+  assert.match(faq, /<SectionHeader /)
+  assert.match(faq, /whitespace-pre-line/)
+})
