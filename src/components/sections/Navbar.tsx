@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type HTMLAttributes } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { NAV_LINKS } from '@/lib/constants'
 import { navbarScrollState, sameNavbarScrollState, navbarVisualStyle } from '@/lib/navbar-visibility'
-import { focusSectionAnchor } from '@/lib/section-anchors'
+import { focusSectionAnchor, jumpPastPinnedSections } from '@/lib/section-anchors'
 import { useWorldMotion } from '@/lib/site-motion'
 import type { PublicConfig } from '@/lib/config'
 import clsx from 'clsx'
@@ -114,7 +114,7 @@ export function Navbar({ config }: NavbarProps) {
               <a
                 key={link.href}
                 href={link.href}
-                onClick={focusSectionAnchor}
+                onClick={event => { jumpPastPinnedSections(event); focusSectionAnchor(event) }}
                 className="text-[16px] tracking-[1.2px] uppercase text-ink/80 hover:text-ink transition-colors whitespace-nowrap"
               >
                 {link.label}
@@ -189,7 +189,7 @@ export function Navbar({ config }: NavbarProps) {
                 <motion.a
                   key={link.href}
                   href={link.href}
-                  onClick={event => { focusSectionAnchor(event); setMobileOpen(false) }}
+                  onClick={event => { jumpPastPinnedSections(event); focusSectionAnchor(event); setMobileOpen(false) }}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: reduced ? 0 : i * 0.05 + 0.05, duration: reduced ? 0 : 0.2 }}
