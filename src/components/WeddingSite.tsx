@@ -17,6 +17,10 @@ import { GamesSection } from '@/components/sections/GamesSection'
 import { RSVPDialog } from '@/components/sections/RSVPDialog'
 import { WeddingJourney } from '@/world/Journey'
 import { arrowUp } from '@/extra-assets'
+import { afterPhotosSettled } from '@/lib/loading/photo-warmer'
+
+/** The 3D engine never waits longer than this for the photos. */
+const ENGINE_LATEST_MS = 15000
 
 const WorldEngine = dynamic(() => import('@/world/WeddingWorld'), { ssr: false })
 
@@ -29,10 +33,15 @@ function Content({ config }: { config: PublicConfig }) {
     if (!hero) return
     const observer = new IntersectionObserver(([entry]) => setBackTop(!entry.isIntersecting))
     observer.observe(hero)
-    // Start the 3D engine straight away, while the welcome screen is still up, so its
-    // setup and shader compilation never happen in the middle of a scroll.
-    setWorldReady(true)
-    return () => observer.disconnect()
+    // Photos come first: the 3D engine and its model start once the photos are in, or sooner
+    // if a 3D scene comes close to the screen, or after a time limit, so it never blocks them.
+    const start = () => setWorldReady(true)
+    const scenes = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) start() }, { rootMargin: '200% 0px' })
+    document.querySelectorAll('[data-wedding-scene]').forEach(scene => scenes.observe(scene))
+    const idle = () => { if ('requestIdleCallback' in window) window.requestIdleCallback(start, { timeout: 2000 }); else start() }
+    const cancel = afterPhotosSettled(idle)
+    const latest = window.setTimeout(start, ENGINE_LATEST_MS)
+    return () => { observer.disconnect(); scenes.disconnect(); cancel(); window.clearTimeout(latest) }
   }, [])
   useEffect(() => {
     const trap = (event: KeyboardEvent) => {

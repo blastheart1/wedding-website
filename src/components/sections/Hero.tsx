@@ -34,12 +34,21 @@ export function Hero({ config }: HeroProps) {
   const {reduced} = useWorldMotion()
   const backgroundRef = useRef<HTMLVideoElement>(null)
   const [modal, setModal] = useState(false)
+  // The video is chosen on the device, so a phone fetches the small copy and nothing is downloaded before the page is ready.
+  // The poster shows meanwhile. With Save-Data on, the poster stays and the video is not fetched.
+  const [videoSrc, setVideoSrc] = useState<string>()
+  useEffect(() => {
+    if (!heroVideoUrl) return
+    const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData
+    if (saveData) return
+    setVideoSrc(backgroundVideoUrl(heroVideoUrl, window.matchMedia('(max-width: 767px)').matches))
+  }, [heroVideoUrl])
   useEffect(() => {
     const video=backgroundRef.current
     if(!video)return
     if(reduced){video.pause();return}
     video.play().then(()=>{if(document.documentElement.dataset.siteMotion==='reduced')video.pause()}).catch(()=>{})
-  }, [reduced])
+  }, [reduced, videoSrc])
   useEffect(() => { if (!modal) return; const prior = document.activeElement as HTMLElement; const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setModal(false) }; document.addEventListener('keydown',handler); const old=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.removeEventListener('keydown',handler);document.body.style.overflow=old;prior?.focus()} },[modal])
   const modalVideoRef     = useRef<HTMLVideoElement>(null)
 
@@ -85,7 +94,7 @@ export function Hero({ config }: HeroProps) {
             crossOrigin="anonymous"
             data-hero-video="true"
             // A lighter, silent copy for the background; the story player below keeps the original.
-            src={backgroundVideoUrl(heroVideoUrl)}
+            src={videoSrc}
           />
         ) : hasBgImage ? (
           <>

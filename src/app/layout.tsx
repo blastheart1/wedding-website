@@ -41,6 +41,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* The opening video comes straight from the media host: open the connection early. */}
+        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
+      </head>
       <body>
         {children}
         <Toaster position="bottom-center" richColors />

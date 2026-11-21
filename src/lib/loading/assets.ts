@@ -1,6 +1,6 @@
 /**
- * Everything the site needs before a guest starts scrolling, with a rough
- * weight (kilobytes) so the progress line moves in proportion to real work.
+ * Every site picture and model, with a rough weight (kilobytes). Only the gate list
+ * holds the welcome; the rest is warmed in the background after the doors open.
  * Keep in step with public/wedding: a test checks every file exists.
  */
 export type AssetKind = 'image' | 'data'
@@ -11,24 +11,37 @@ export interface SiteAsset {
   weight: number
 }
 
-export const SITE_ASSETS: readonly SiteAsset[] = [
+/** What the first screen needs: the opening picture. Nothing else holds the welcome back. */
+export const GATE_ASSETS: readonly SiteAsset[] = [
   { url: '/wedding/scene-1.jpg', kind: 'image', weight: 150 },
-  { url: '/wedding/scene-2.jpg', kind: 'image', weight: 280 },
-  { url: '/wedding/scene-3.jpg', kind: 'image', weight: 420 },
-  { url: '/wedding/church-1.jpg', kind: 'image', weight: 680 },
-  { url: '/wedding/church-2.jpg', kind: 'image', weight: 620 },
-  { url: '/wedding/church-3.jpg', kind: 'image', weight: 450 },
+]
+
+/**
+ * Only files the page uses as they are (the 3D textures and model, the small symbol). Photos that
+ * pass through the image optimizer are warmed from the page itself, by size (see photo-warmer.ts),
+ * because fetching the original here would download a second, larger copy nobody shows.
+ */
+export const BACKGROUND_ASSETS: readonly SiteAsset[] = [
   { url: '/wedding/dress-warning-1.png', kind: 'image', weight: 30 },
   { url: '/wedding/moon-color-nasa.jpg', kind: 'image', weight: 460 },
   { url: '/wedding/moon-height-nasa.jpg', kind: 'image', weight: 110 },
-  { url: '/wedding/wedding-couple-storyboard.glb', kind: 'data', weight: 3730 },
+  { url: '/wedding/wedding-couple-storyboard.min.glb', kind: 'data', weight: 1310 },
 ]
 
-/** Steps that are not plain files: the typefaces, the 3D engine code and the opening video. */
-export const EXTRA_STEPS = { fonts: 1200, engine: 700, video: 900 } as const
+/** Kept only as a fallback for a compressed copy. Never warmed: it is three times the size. */
+export const FALLBACK_ASSETS: readonly string[] = ['/wedding/wedding-couple-storyboard.glb']
 
-export const TOTAL_WEIGHT =
-  SITE_ASSETS.reduce((sum, asset) => sum + asset.weight, 0) + EXTRA_STEPS.fonts + EXTRA_STEPS.engine + EXTRA_STEPS.video
+/** Photos shown through the image optimizer. The page warms them itself, at the size it shows (photo-warmer.ts). */
+export const OPTIMISED_ASSETS: readonly string[] = [
+  '/wedding/scene-2.jpg', '/wedding/scene-3.jpg', '/wedding/church-1.jpg', '/wedding/church-2.jpg', '/wedding/church-3.jpg',
+]
+
+export const SITE_ASSETS: readonly SiteAsset[] = [...GATE_ASSETS, ...BACKGROUND_ASSETS]
+
+/** The only step in front of the doors that is not a plain file: the typefaces used above the fold. */
+export const EXTRA_STEPS = { fonts: 1200 } as const
+
+export const TOTAL_WEIGHT = GATE_ASSETS.reduce((sum, asset) => sum + asset.weight, 0) + EXTRA_STEPS.fonts
 
 /** Share of the work finished, from 0 to 1. Never goes backwards and never exceeds 1. */
 export function progressOf(doneWeight: number): number {
@@ -62,9 +75,9 @@ export const TIMING = {
   /** First visit: keep the welcome on screen at least this long so it never flashes. */
   minFirstVisitMs: 1400,
   /** Offer "Enter now" after this long, for slow connections. */
-  offerSkipAfterMs: 6000,
-  /** Never hold a guest longer than this, whatever is still loading. */
-  hardCapMs: 20000,
+  offerSkipAfterMs: 2500,
+  /** Never hold a guest longer than this, whatever is still loading. The gate is small, so this is a safety net only. */
+  hardCapMs: 5000,
   /** Length of the doors opening. */
   exitMs: 1100,
 } as const
