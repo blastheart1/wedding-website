@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed-faqs": "node scripts/seed-faqs.cjs",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "npm run test:ui && npm run test:rsvp && npm run test:cms && npm run test:invitations && npm run test:seating && npm run test:site",
     "test:seating": "node --test scripts/test-seating.cjs",

@@ -64,7 +64,7 @@ function FAQItemRow({ item, index }: { item: FAQItem; index: number }) {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="overflow-hidden"
           >
-            <p className="pb-4 text-[13px] text-ink2 leading-relaxed">
+            <p className="whitespace-pre-line pb-4 text-[13px] text-ink2 leading-relaxed">
               {item.answer}
             </p>
           </motion.div>
