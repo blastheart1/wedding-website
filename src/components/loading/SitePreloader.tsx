@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { progressOf, stageLabel, TIMING, visitedCookie } from '@/lib/loading/assets'
-import { preloadSite } from '@/lib/loading/preload'
+import { preloadSite, warmSite } from '@/lib/loading/preload'
+import { afterPhotosSettled, startPhotoWarmer } from '@/lib/loading/photo-warmer'
 import { STATUS_EVENT } from '@/lib/loading/status-color'
 
 interface SitePreloaderProps {
@@ -17,7 +18,7 @@ type Phase = 'loading' | 'opening' | 'gone'
 
 /**
  * The welcome a guest sees while the site gets ready. It covers the page,
- * loads every asset, then parts like a pair of doors. It can never trap
+ * loads only what the first screen needs, then parts like a pair of doors. It can never trap
  * anyone: there is a skip button, a hard time limit, and CSS and noscript
  * fallbacks that remove it if the script fails.
  */
@@ -33,6 +34,10 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     document.cookie = visitedCookie(window.location.protocol === 'https:')
     const reduced = document.documentElement.dataset.siteMotion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     setPhase('opening')
+    // The rest of the site loads behind the doors, never in front of them: photos first,
+    // then the 3D model and textures.
+    startPhotoWarmer()
+    afterPhotosSettled(() => { void warmSite(() => import('@/world/WeddingWorld')) })
     window.setTimeout(() => setPhase('gone'), reduced ? 250 : TIMING.exitMs)
   })
 
@@ -55,7 +60,7 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     const skipTimer = window.setTimeout(() => setOfferSkip(true), TIMING.offerSkipAfterMs)
     const capTimer = window.setTimeout(() => open.current(), TIMING.hardCapMs)
 
-    preloadSite(() => import('@/world/WeddingWorld'), weight => setProgress(current => Math.max(current, progressOf(weight)))).then(() => {
+    preloadSite(weight => setProgress(current => Math.max(current, progressOf(weight)))).then(() => {
       setProgress(1)
       const minimum = returning ? 0 : TIMING.minFirstVisitMs
       window.setTimeout(() => open.current(), Math.max(0, minimum - (performance.now() - started)))

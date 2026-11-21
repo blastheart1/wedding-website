@@ -1,5 +1,6 @@
 import * as T from 'three'
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js'
+import {MeshoptDecoder} from 'three/examples/jsm/libs/meshopt_decoder.module.js'
 import {characterState,clipNames,damp,type SceneName,type ClipName,type NightMode} from './character-motion'
 
 /** One mixer owns the paired clips: their hands and feet stay on the same clock. */
@@ -59,7 +60,11 @@ export class RiggedCouple {
  }
  dispose(){this.mixer.stopAllAction();this.mixer.uncacheRoot(this.model)}
 }
+/** The compressed copy is a third of the size. The original stays as the source of truth and the fallback. */
+export const COUPLE_MODEL_URLS=['/wedding/wedding-couple-storyboard.min.glb','/wedding/wedding-couple-storyboard.glb'] as const
 export async function loadRiggedCouple(){
- const gltf=await new GLTFLoader().loadAsync('/wedding/wedding-couple-storyboard.glb')
+ const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+ let gltf
+ try{gltf=await loader.loadAsync(COUPLE_MODEL_URLS[0])}catch{gltf=await loader.loadAsync(COUPLE_MODEL_URLS[1])}
  return new RiggedCouple(gltf.scene,gltf.animations)
 }

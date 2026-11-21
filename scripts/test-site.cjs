@@ -24,7 +24,8 @@ const assets = load('src/lib/loading/assets.ts')
 
 test('loading: every listed asset exists and every referenced site asset is listed', () => {
   for (const asset of assets.SITE_ASSETS) assert.ok(fs.existsSync(path.join(root, 'public', asset.url)), asset.url)
-  const listed = new Set(assets.SITE_ASSETS.map(asset => asset.url))
+  for (const url of [...assets.FALLBACK_ASSETS, ...assets.OPTIMISED_ASSETS]) assert.ok(fs.existsSync(path.join(root, 'public', url)), url)
+  const listed = new Set([...assets.SITE_ASSETS.map(asset => asset.url), ...assets.FALLBACK_ASSETS, ...assets.OPTIMISED_ASSETS])
   const referenced = new Set()
   const walk = dir => { for (const entry of fs.readdirSync(dir, { withFileTypes: true })) { const full = path.join(dir, entry.name); if (entry.isDirectory()) walk(full); else if (/\.tsx?$/.test(entry.name) && !full.includes(path.join('lib', 'loading'))) for (const match of fs.readFileSync(full, 'utf8').matchAll(/\/wedding\/[A-Za-z0-9._-]+\.(?:jpg|png|glb)/g)) referenced.add(match[0]) } }
   walk(path.join(root, 'src'))
@@ -38,8 +39,100 @@ test('loading: progress runs from 0 to 1, never beyond, and ignores bad input', 
   for (const bad of [-5, NaN, Infinity, undefined]) assert.equal(assets.progressOf(bad), 0)
   const half = assets.progressOf(assets.TOTAL_WEIGHT / 2)
   assert.ok(half > 0.49 && half < 0.51)
-  const sum = assets.SITE_ASSETS.reduce((total, asset) => total + asset.weight, 0) + assets.EXTRA_STEPS.fonts + assets.EXTRA_STEPS.engine + assets.EXTRA_STEPS.video
+  const sum = assets.GATE_ASSETS.reduce((total, asset) => total + asset.weight, 0) + assets.EXTRA_STEPS.fonts
   assert.equal(assets.TOTAL_WEIGHT, sum)
+})
+
+test('loading: the couple model is the compressed copy, with the original as the fallback and never warmed', () => {
+  const rig = read('src/world/RiggedCouple.ts')
+  assert.match(rig, /setMeshoptDecoder\(MeshoptDecoder\)/)
+  assert.match(rig, /COUPLE_MODEL_URLS=\['\/wedding\/wedding-couple-storyboard\.min\.glb','\/wedding\/wedding-couple-storyboard\.glb'\]/)
+  assert.ok(assets.BACKGROUND_ASSETS.some(asset => asset.url.endsWith('.min.glb')))
+  assert.ok(!assets.SITE_ASSETS.some(asset => asset.url === '/wedding/wedding-couple-storyboard.glb'), 'the 3.7 MB original is not warmed')
+  const small = fs.statSync(path.join(root, 'public/wedding/wedding-couple-storyboard.min.glb')).size
+  assert.ok(small < fs.statSync(path.join(root, 'public/wedding/wedding-couple-storyboard.glb')).size / 2)
+})
+
+test('photos: church photos go through the optimizer, with the layout untouched and unknown hosts left alone', () => {
+  const details = read('src/components/sections/Details.tsx')
+  assert.match(details, /optimisedImage\(selectedPhoto\.src/)
+  assert.match(details, /optimisedImage\(p\.src/)
+  assert.ok(!/<img src=\{p\.src\} alt=""\/>/.test(details), 'thumbnails are no longer eager raw originals')
+  const helper = read('src/lib/images/optimised-props.ts')
+  assert.match(helper, /res\\\.cloudinary\\\.com/)
+  assert.match(helper, /OPTIMISABLE\.some/)
+  assert.ok(!assets.BACKGROUND_ASSETS.some(asset => /church|scene-/.test(asset.url)), 'originals the page shows through the optimizer are not downloaded a second time')
+})
+
+test('fonts: every face is served as WOFF2 first with the TTF kept as the fallback, and both files exist', () => {
+  const css = read('src/app/globals.css')
+  const faces = css.match(/@font-face\s*\{[^}]*\}/g) || []
+  assert.equal(faces.length, 6)
+  for (const face of faces) {
+    const woff = /url\(\/wedding\/(font-\d)\.woff2\) format\(['"]woff2['"]\)\s*,\s*url\(\/wedding\/(font-\d)\.ttf\) format\(['"]truetype['"]\)/.exec(face)
+    assert.ok(woff && woff[1] === woff[2], 'woff2 first, then the matching ttf')
+    assert.ok(/font-display:\s*swap/.test(face))
+    for (const ext of ['woff2', 'ttf']) assert.ok(fs.existsSync(path.join(root, 'public/wedding', woff[1] + '.' + ext)))
+    assert.ok(fs.statSync(path.join(root, 'public/wedding', woff[1] + '.woff2')).size < fs.statSync(path.join(root, 'public/wedding', woff[1] + '.ttf')).size)
+  }
+})
+
+test('loading: only the first screen is in front of the doors, everything else loads behind them', () => {
+  assert.ok(assets.GATE_ASSETS.length <= 2 && assets.GATE_ASSETS.reduce((total, asset) => total + asset.weight, 0) <= 300, 'the gate stays tiny')
+  assert.ok(assets.GATE_ASSETS.every(asset => asset.kind === 'image'), 'no model or video on the gate')
+  const heavy = assets.SITE_ASSETS.filter(asset => asset.weight > 300).map(asset => asset.url)
+  for (const url of heavy) assert.ok(!assets.GATE_ASSETS.some(asset => asset.url === url), url + ' must not hold the welcome')
+  assert.deepEqual([...assets.SITE_ASSETS.map(a => a.url)].sort(), [...assets.GATE_ASSETS, ...assets.BACKGROUND_ASSETS].map(a => a.url).sort())
+  assert.equal(new Set(assets.SITE_ASSETS.map(a => a.url)).size, assets.SITE_ASSETS.length, 'no asset twice')
+  const preload = read('src/lib/loading/preload.ts')
+  const gate = preload.slice(preload.indexOf('export function preloadSite'), preload.indexOf('const WARM_CONCURRENCY'))
+  assert.ok(!/loadEngine|videoReady|worldPrepared|BACKGROUND_ASSETS/.test(gate), 'the gate waits for no engine, video or background asset')
+  const preloader = read('src/components/loading/SitePreloader.tsx')
+  assert.match(preloader, /warmSite\(\(\) => import\('@\/world\/WeddingWorld'\)\)/)
+  assert.match(preloader, /startPhotoWarmer\(\)/)
+  assert.match(read('src/app/layout.tsx'), /rel="preconnect" href="https:\/\/res\.cloudinary\.com"/)
+})
+
+test('loading: runLimited keeps to its limit, keeps going after a failure, and starts nothing twice', async () => {
+  const { runLimited } = load('src/lib/loading/run-limited.ts')
+  let running = 0, peak = 0
+  const seen = []
+  await runLimited([1, 2, 3, 4, 5, 6, 7], 3, async item => {
+    running++; peak = Math.max(peak, running); seen.push(item)
+    await new Promise(resolve => setTimeout(resolve, 5))
+    running--
+    if (item === 2) throw new Error('one fails')
+  })
+  assert.equal(peak, 3)
+  assert.deepEqual(seen.sort(), [1, 2, 3, 4, 5, 6, 7])
+  await runLimited([], 3, async () => { throw new Error('never') })
+})
+
+test('photos: the photo nearest the screen is always next, below first, passed ones count double', () => {
+  const { distanceFromView, closestToView } = load('src/lib/loading/nearest.ts')
+  assert.equal(distanceFromView(100, 300, 0, 800), 0, 'on screen')
+  assert.equal(distanceFromView(1000, 1200, 0, 800), 200, 'below')
+  assert.equal(distanceFromView(0, 100, 500, 800), 800, 'above counts double')
+  const items = [{ id: 'far', top: 5000, bottom: 5400 }, { id: 'passed', top: 0, bottom: 300 }, { id: 'next', top: 1500, bottom: 1900 }, { id: 'here', top: 600, bottom: 900 }]
+  assert.equal(closestToView(items, item => item, 500, 800).id, 'here')
+  assert.equal(closestToView(items.filter(item => item.id !== 'here'), item => item, 500, 800).id, 'next', 'below beats a photo just passed only when nearer')
+  assert.equal(closestToView([], item => item, 0, 800), undefined)
+  assert.equal(closestToView([{ top: 900, bottom: 1000 }, { top: 900, bottom: 1000 }], item => item, 0, 800).top, 900)
+})
+
+test('photos: the warmer brings lazy photos forward in page order, nearest first, and never twice', () => {
+  const warmer = read('src/lib/loading/photo-warmer.ts')
+  assert.match(warmer, /querySelectorAll<LazyPhoto>\('img\[loading="lazy"\]'\)/)
+  assert.match(warmer, /photo\.loading = 'eager'/)
+  assert.match(warmer, /photo\.decode\(\)/)
+  assert.match(warmer, /closestToView\(waiting/)
+  assert.match(warmer, /new IntersectionObserver/)
+  assert.match(warmer, /LOOK_AHEAD_SCREENS \* 100/)
+  assert.match(warmer, /new MutationObserver/)
+  assert.match(warmer, /saveData/)
+  assert.match(warmer, /photosWarming === 'true'/)
+  assert.match(warmer, /removeEventListener\('error', finish\)/)
+  assert.match(read('src/app/globals.css'), /img\[data-photo-pending\]\{background-color:/)
 })
 
 test('loading: stage lines follow the progress in order and contain no emoji', () => {
@@ -57,7 +150,7 @@ test('loading: the returning-visitor cookie holds no personal data and is scoped
 
 test('loading: a guest can never be trapped behind the welcome', () => {
   const { TIMING } = assets
-  assert.ok(TIMING.offerSkipAfterMs < TIMING.hardCapMs && TIMING.hardCapMs <= 20000)
+  assert.ok(TIMING.offerSkipAfterMs < TIMING.hardCapMs && TIMING.hardCapMs <= 5000)
   const preloader = read('src/components/loading/SitePreloader.tsx')
   assert.match(preloader, /TIMING\.hardCapMs/)
   assert.match(preloader, /Enter now/)
@@ -246,7 +339,11 @@ test('performance: the background video is requested in a lighter form, once', (
   assert.equal(media.backgroundVideoUrl('https://res.cloudinary.com/demo/video/upload/clip.mp4'), 'https://res.cloudinary.com/demo/video/upload/q_auto:good,w_1280,c_limit,vc_h264,ac_none/clip.mp4')
   for (const other of ['https://example.com/video.mp4', '/wedding/scene-5.mp4', '', 'https://res.cloudinary.com/demo/image/upload/v1/a.jpg']) assert.equal(media.backgroundVideoUrl(other), other)
   const hero = read('src/components/sections/Hero.tsx')
-  assert.match(hero, /src=\{backgroundVideoUrl\(heroVideoUrl\)\}/)
+  assert.match(hero, /src=\{videoSrc\}/)
+  assert.match(hero, /backgroundVideoUrl\(heroVideoUrl, window\.matchMedia\('\(max-width: 767px\)'\)\.matches\)/)
+  assert.match(hero, /if \(saveData\) return/)
+  assert.equal(media.backgroundVideoUrl(original, true).includes(media.PHONE_VIDEO_TRANSFORM), true, 'phones get the small copy')
+  assert.ok(media.PHONE_VIDEO_TRANSFORM.includes('w_720') && media.PHONE_VIDEO_TRANSFORM.includes('ac_none'))
   assert.match(hero, /ref=\{modalVideoRef\}\s+src=\{heroVideoUrl\}/, 'the story player keeps the original video with sound')
 })
 
@@ -259,7 +356,11 @@ test('performance: 3D scenes are prepared during the welcome, not during a scrol
   assert.ok(!/new T\.Fog\([^)]*\)[^\n]*\n[^\n]*drawWorld/.test(world) && (world.match(/new T\.Fog\(/g) || []).length === 2, 'fog objects are created once, not per frame')
   assert.ok(!/world\.scene\.background=kind==='peek'\?null:new T\.Color/.test(world), 'background colours are reused')
   assert.match(read('src/components/WeddingSite.tsx'), /setWorldReady\(true\)/)
-  assert.ok(!/rootMargin: '500px'/.test(read('src/components/WeddingSite.tsx')), 'the engine no longer waits for a scene to approach')
+  const site = read('src/components/WeddingSite.tsx')
+  assert.match(site, /afterPhotosSettled\(idle\)/, 'the engine starts once the photos are in')
+  assert.match(site, /rootMargin: '200% 0px'/, 'or sooner when a 3D scene comes near')
+  assert.match(site, /ENGINE_LATEST_MS = 15000/, 'and never later than the time limit')
+  assert.match(read('src/components/loading/SitePreloader.tsx'), /afterPhotosSettled\(\(\) => \{ void warmSite/, 'model and textures warm after the photos')
   const preload = read('src/lib/loading/preload.ts')
   assert.match(preload, /loadEngine\(\)\.then\(worldPrepared/)
   assert.match(preload, /WORLD_WAIT_MS = 8000/)

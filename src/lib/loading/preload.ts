@@ -1,4 +1,5 @@
-import { EXTRA_STEPS, SITE_ASSETS, type SiteAsset } from './assets'
+import { runLimited } from './run-limited'
+import { BACKGROUND_ASSETS, EXTRA_STEPS, GATE_ASSETS, type SiteAsset } from './assets'
 
 /** Each step resolves whether it succeeded or not: a missing file must never trap a guest. */
 type Step = { weight: number; run: () => Promise<unknown> }
@@ -19,20 +20,16 @@ function loadData(url: string): Promise<void> {
 
 function loadFonts(): Promise<void> {
   if (!document.fonts) return Promise.resolve()
-  const faces = ['400 1em "Cormorant Garamond"', 'italic 400 1em "Cormorant Garamond"', '500 1em "Cormorant Garamond"', '400 1em Jost', '500 1em Jost', '400 1em Lora']
-  return Promise.all(faces.map(face => document.fonts.load(face).catch(() => undefined))).then(() => undefined)
+  return Promise.all(FRONT_FACES.map(face => document.fonts.load(face).catch(() => undefined))).then(() => undefined)
 }
 
-/** Resolves once the opening video can start playing, or straight away if there is none. */
-function videoReady(): Promise<void> {
-  const video = document.querySelector<HTMLVideoElement>('#home video')
-  if (!video || video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) return Promise.resolve()
-  return new Promise(resolve => {
-    const done = () => resolve()
-    video.addEventListener('canplay', done, { once: true })
-    video.addEventListener('error', done, { once: true })
-    video.addEventListener('stalled', done, { once: true })
-  })
+/** The faces the first screen is written in. The rest load as they are needed, with the fallback font showing meanwhile. */
+const FRONT_FACES = ['400 1em "Cormorant Garamond"', 'italic 400 1em "Cormorant Garamond"', '400 1em Jost']
+const OTHER_FACES = ['500 1em "Cormorant Garamond"', '500 1em Jost', '400 1em Lora']
+
+function loadOtherFonts(): Promise<void> {
+  if (!document.fonts) return Promise.resolve()
+  return Promise.all(OTHER_FACES.map(face => document.fonts.load(face).catch(() => undefined))).then(() => undefined)
 }
 
 /** How long to wait for the 3D scenes to finish preparing before letting the guest in anyway. */
@@ -63,17 +60,12 @@ const assetStep = (asset: SiteAsset): Step => ({
 })
 
 /**
- * Loads everything, reporting the finished weight after each step.
- * `loadEngine` is passed in so the 3D code is fetched through the same
- * import the page uses, and is therefore downloaded only once.
+ * The welcome's gate: only the opening picture and the typefaces of the first
+ * screen. Reports the finished weight after each step. Every step resolves,
+ * success or not, so a missing file can never trap a guest.
  */
-export function preloadSite(loadEngine: () => Promise<unknown>, onProgress: (doneWeight: number) => void): Promise<void> {
-  const steps: Step[] = [
-    ...SITE_ASSETS.map(assetStep),
-    { weight: EXTRA_STEPS.fonts, run: loadFonts },
-    { weight: EXTRA_STEPS.engine, run: () => loadEngine().then(worldPrepared, () => undefined) },
-    { weight: EXTRA_STEPS.video, run: videoReady },
-  ]
+export function preloadSite(onProgress: (doneWeight: number) => void): Promise<void> {
+  const steps: Step[] = [...GATE_ASSETS.map(assetStep), { weight: EXTRA_STEPS.fonts, run: loadFonts }]
   let done = 0
   return Promise.all(steps.map(step =>
     step.run().catch(() => undefined).then(() => {
@@ -81,4 +73,27 @@ export function preloadSite(loadEngine: () => Promise<unknown>, onProgress: (don
       onProgress(done)
     }),
   )).then(() => undefined)
+}
+
+const WARM_CONCURRENCY = 2
+
+/**
+ * Everything else, started once the doors open and never waited for: the 3D
+ * engine first (the scenes are the next thing a guest scrolls to), then the
+ * pictures and the model in scroll order, then the remaining typefaces.
+ * `loadEngine` is the page's own import, so the engine is downloaded once.
+ */
+let warming: Promise<void> | null = null
+
+export function warmSite(loadEngine: () => Promise<unknown>): Promise<void> {
+  if (warming) return warming
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
+  if (connection?.saveData) return Promise.resolve()
+  const tasks: (() => Promise<unknown>)[] = [
+    () => loadEngine().then(worldPrepared, () => undefined),
+    ...BACKGROUND_ASSETS.map(asset => () => assetStep(asset).run()),
+    loadOtherFonts,
+  ]
+  warming = runLimited(tasks, WARM_CONCURRENCY, task => task())
+  return warming
 }

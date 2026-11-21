@@ -3,39 +3,44 @@
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url(/wedding/font-1.ttf) format('truetype');
+  src: url(/wedding/font-1.woff2) format('woff2'),
+       url(/wedding/font-1.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Cormorant Garamond';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/wedding/font-2.ttf) format('truetype');
+  src: url(/wedding/font-2.woff2) format('woff2'),
+       url(/wedding/font-2.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Cormorant Garamond';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url(/wedding/font-3.ttf) format('truetype');
+  src: url(/wedding/font-3.woff2) format('woff2'),
+       url(/wedding/font-3.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Jost';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url(/wedding/font-4.ttf) format('truetype');
+  src: url(/wedding/font-4.woff2) format('woff2'),
+       url(/wedding/font-4.ttf) format('truetype');
 }
 @font-face {
   font-family: 'Jost';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url(/wedding/font-5.ttf) format('truetype');
+  src: url(/wedding/font-5.woff2) format('woff2'),
+       url(/wedding/font-5.ttf) format('truetype');
 }
 
 /* Lora: SIL Open Font License 1.1. See bundled assets/Lora-OFL.txt. */
-@font-face{font-family:Lora;src:url(/wedding/font-6.ttf) format("truetype");font-style:normal;font-weight:400 700;font-display:swap}
+@font-face{font-family:Lora;src:url(/wedding/font-6.woff2) format("woff2"),url(/wedding/font-6.ttf) format("truetype");font-style:normal;font-weight:400 700;font-display:swap}
 
 @tailwind base;
 @tailwind components;
@@ -408,3 +413,6 @@ html[data-site-motion=reduced] .corner-peel{animation:none}
 .peel-contact .peel-mail{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:#2e1f1a14;text-decoration:none}
 @media (prefers-reduced-motion:reduce){.peel-sheet,.peel-flap,.peel-canvas{transition:none}}
 html[data-site-motion=reduced] .peel-sheet,html[data-site-motion=reduced] .peel-flap,html[data-site-motion=reduced] .peel-canvas{transition:none}
+
+/* A photo that is still on its way shows a soft tint, never an empty hole. Set by the photo warmer, removed when the photo is in. */
+img[data-photo-pending]{background-color:rgba(46,31,26,.08)}

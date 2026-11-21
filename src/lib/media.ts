@@ -5,16 +5,19 @@ const CLOUDINARY_VIDEO = /^(https:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload
 /** Good-quality H.264, at most 1280 wide, no audio track: the background video is always muted. */
 export const BACKGROUND_VIDEO_TRANSFORM = 'q_auto:good,w_1280,c_limit,vc_h264,ac_none'
 
+/** For phones: 720 wide is plenty behind the dark overlay, and about a fifth of the weight (0.6 MB instead of 3.1 MB). */
+export const PHONE_VIDEO_TRANSFORM = 'q_auto:eco,w_720,c_limit,vc_h264,ac_none'
+
 /**
  * The address to use for a muted background video. A Cloudinary upload is
  * requested in a lighter form (a 20 MB original becomes about 3 MB); any
  * other address, or one that already carries a transformation, is used as it is.
  */
-export function backgroundVideoUrl(url: string): string {
+export function backgroundVideoUrl(url: string, phone = false): string {
   const match = CLOUDINARY_VIDEO.exec(url.trim())
   if (!match) return url
   const first = match[2].split('/')[0]
   // A version ("v1700000000") or a plain file name means no transformation has been applied yet.
   const untransformed = /^v\d+$/.test(first) || !first.includes('_') || first.includes('.')
-  return untransformed ? `${match[1]}${BACKGROUND_VIDEO_TRANSFORM}/${match[2]}` : url
+  return untransformed ? `${match[1]}${phone ? PHONE_VIDEO_TRANSFORM : BACKGROUND_VIDEO_TRANSFORM}/${match[2]}` : url
 }
