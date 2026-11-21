@@ -37,8 +37,12 @@ export function PresentationGroups({ config, setConfig }: PresentationGroupsProp
       </Group>
 
       <Group label="Dress code">
-        {text('dressDescription', 'Description', 3)}
-        {text('dressRestrictions', 'Restrictions', 3)}
+        {text('dressDescription', 'Line under the heading (optional)', 2)}
+        {text('dressWomen', 'Women', 3)}
+        {text('dressMen', 'Men', 3)}
+        {text('dressRestrictions', 'Colors not allowed', 3)}
+        {text('dressAvoidAttire', 'Attire not allowed', 2)}
+        {text('dressChurch', 'Church reminder', 2)}
       </Group>
 
       <Group label="Footer">
