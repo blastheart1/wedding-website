@@ -38,10 +38,16 @@ export const OPTIMISED_ASSETS: readonly string[] = [
 
 export const SITE_ASSETS: readonly SiteAsset[] = [...GATE_ASSETS, ...BACKGROUND_ASSETS]
 
-/** The only step in front of the doors that is not a plain file: the typefaces used above the fold. */
-export const EXTRA_STEPS = { fonts: 1200 } as const
+/**
+ * The steps in front of the doors that are not plain files: the typefaces used above the fold, the 3D
+ * scenes (engine, model and textures, drawn once so nothing is compiled mid-scroll), and the first photos.
+ */
+export const EXTRA_STEPS = { fonts: 1200, engine: 2300, photos: 600 } as const
 
-export const TOTAL_WEIGHT = GATE_ASSETS.reduce((sum, asset) => sum + asset.weight, 0) + EXTRA_STEPS.fonts
+/** How many photos, counted from the top of the page, the welcome waits for. */
+export const FIRST_PHOTOS = 6
+
+export const TOTAL_WEIGHT = GATE_ASSETS.reduce((sum, asset) => sum + asset.weight, 0) + EXTRA_STEPS.fonts + EXTRA_STEPS.engine + EXTRA_STEPS.photos
 
 /** Share of the work finished, from 0 to 1. Never goes backwards and never exceeds 1. */
 export function progressOf(doneWeight: number): number {
@@ -76,8 +82,10 @@ export const TIMING = {
   minFirstVisitMs: 1400,
   /** Offer "Enter now" after this long, for slow connections. */
   offerSkipAfterMs: 2500,
-  /** Never hold a guest longer than this, whatever is still loading. The gate is small, so this is a safety net only. */
-  hardCapMs: 5000,
+  /** Never hold a guest longer than this, whatever is still loading. Slow phones are let in at this point, whatever is still arriving. */
+  hardCapMs: 6000,
+  /** Even if the limit has already passed when the script wakes (a very slow device), keep the welcome at least this long. */
+  capFloorMs: 800,
   /** Length of the doors opening. */
   exitMs: 1100,
 } as const

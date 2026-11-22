@@ -414,5 +414,5 @@ html[data-site-motion=reduced] .corner-peel{animation:none}
 @media (prefers-reduced-motion:reduce){.peel-sheet,.peel-flap,.peel-canvas{transition:none}}
 html[data-site-motion=reduced] .peel-sheet,html[data-site-motion=reduced] .peel-flap,html[data-site-motion=reduced] .peel-canvas{transition:none}
 
-/* A photo that is still on its way shows a soft tint, never an empty hole. Set by the photo warmer, removed when the photo is in. */
-img[data-photo-pending]{background-color:rgba(46,31,26,.08)}
+/* A photo that is still on its way shows a tiny blurred copy of itself (or a soft tint), never an empty hole. Set by the photo warmer, removed when the photo is in. */
+img[data-photo-pending]{background-color:rgba(46,31,26,.08);background-image:var(--photo-preview,none);background-size:cover;background-position:center}
