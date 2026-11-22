@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { progressOf, stageLabel, TIMING, visitedCookie } from '@/lib/loading/assets'
+import { FIRST_PHOTOS, progressOf, stageLabel, TIMING, visitedCookie } from '@/lib/loading/assets'
 import { preloadSite, warmSite } from '@/lib/loading/preload'
 import { afterPhotosSettled, startPhotoWarmer } from '@/lib/loading/photo-warmer'
 import { STATUS_EVENT } from '@/lib/loading/status-color'
@@ -18,7 +18,7 @@ type Phase = 'loading' | 'opening' | 'gone'
 
 /**
  * The welcome a guest sees while the site gets ready. It covers the page,
- * loads only what the first screen needs, then parts like a pair of doors. It can never trap
+ * loads what the first screen and the 3D scenes need, plus the first photos, then parts like a pair of doors. It can never trap
  * anyone: there is a skip button, a hard time limit, and CSS and noscript
  * fallbacks that remove it if the script fails.
  */
@@ -34,10 +34,8 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     document.cookie = visitedCookie(window.location.protocol === 'https:')
     const reduced = document.documentElement.dataset.siteMotion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches
     setPhase('opening')
-    // The rest of the site loads behind the doors, never in front of them: photos first,
-    // then the 3D model and textures.
-    startPhotoWarmer()
-    afterPhotosSettled(() => { void warmSite(() => import('@/world/WeddingWorld')) })
+    // What is left loads behind the doors once the photos are in, never in front of them.
+    afterPhotosSettled(() => { void warmSite() })
     window.setTimeout(() => setPhase('gone'), reduced ? 250 : TIMING.exitMs)
   })
 
@@ -58,9 +56,12 @@ export function SitePreloader({ partner1, partner2, date, returning }: SitePrelo
     window.addEventListener('pageshow', toTop)
 
     const skipTimer = window.setTimeout(() => setOfferSkip(true), TIMING.offerSkipAfterMs)
-    const capTimer = window.setTimeout(() => open.current(), TIMING.hardCapMs)
+    // The limit counts from the moment the guest asked for the page, not from when this script woke up.
+    const capTimer = window.setTimeout(() => open.current(), Math.max(TIMING.capFloorMs, TIMING.hardCapMs - performance.now()))
 
-    preloadSite(weight => setProgress(current => Math.max(current, progressOf(weight)))).then(() => {
+    // The photos start arriving at once, nearest the top first; the welcome waits for the first few.
+    const photos = startPhotoWarmer()
+    preloadSite(() => import('@/world/WeddingWorld'), () => photos.firstSettled(FIRST_PHOTOS), weight => setProgress(current => Math.max(current, progressOf(weight)))).then(() => {
       setProgress(1)
       const minimum = returning ? 0 : TIMING.minFirstVisitMs
       window.setTimeout(() => open.current(), Math.max(0, minimum - (performance.now() - started)))

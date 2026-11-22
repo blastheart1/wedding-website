@@ -60,12 +60,19 @@ const assetStep = (asset: SiteAsset): Step => ({
 })
 
 /**
- * The welcome's gate: only the opening picture and the typefaces of the first
- * screen. Reports the finished weight after each step. Every step resolves,
- * success or not, so a missing file can never trap a guest.
+ * The welcome's gate: the opening picture, the typefaces of the first screen, the
+ * 3D scenes (so their setup never happens mid-scroll) and the first photos.
+ * Reports the finished weight after each step. Every step resolves, success or
+ * not, so a missing file can never trap a guest; the welcome also has a time
+ * limit. `loadEngine` is the page's own import, so the engine downloads once.
  */
-export function preloadSite(onProgress: (doneWeight: number) => void): Promise<void> {
-  const steps: Step[] = [...GATE_ASSETS.map(assetStep), { weight: EXTRA_STEPS.fonts, run: loadFonts }]
+export function preloadSite(loadEngine: () => Promise<unknown>, firstPhotos: () => Promise<unknown>, onProgress: (doneWeight: number) => void): Promise<void> {
+  const steps: Step[] = [
+    ...GATE_ASSETS.map(assetStep),
+    { weight: EXTRA_STEPS.fonts, run: loadFonts },
+    { weight: EXTRA_STEPS.engine, run: () => loadEngine().then(worldPrepared, () => undefined) },
+    { weight: EXTRA_STEPS.photos, run: firstPhotos },
+  ]
   let done = 0
   return Promise.all(steps.map(step =>
     step.run().catch(() => undefined).then(() => {
@@ -77,23 +84,14 @@ export function preloadSite(onProgress: (doneWeight: number) => void): Promise<v
 
 const WARM_CONCURRENCY = 2
 
-/**
- * Everything else, started once the doors open and never waited for: the 3D
- * engine first (the scenes are the next thing a guest scrolls to), then the
- * pictures and the model in scroll order, then the remaining typefaces.
- * `loadEngine` is the page's own import, so the engine is downloaded once.
- */
 let warming: Promise<void> | null = null
 
-export function warmSite(loadEngine: () => Promise<unknown>): Promise<void> {
+/** What is left once the doors are open and the photos are in: the other typefaces and the small extras. Never waited for. */
+export function warmSite(): Promise<void> {
   if (warming) return warming
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
   if (connection?.saveData) return Promise.resolve()
-  const tasks: (() => Promise<unknown>)[] = [
-    () => loadEngine().then(worldPrepared, () => undefined),
-    ...BACKGROUND_ASSETS.map(asset => () => assetStep(asset).run()),
-    loadOtherFonts,
-  ]
+  const tasks: (() => Promise<unknown>)[] = [...BACKGROUND_ASSETS.map(asset => () => assetStep(asset).run()), loadOtherFonts]
   warming = runLimited(tasks, WARM_CONCURRENCY, task => task())
   return warming
 }

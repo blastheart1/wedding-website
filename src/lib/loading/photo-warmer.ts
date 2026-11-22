@@ -1,27 +1,37 @@
-import { closestToView } from './nearest'
+import { closestToView, distanceFromView, isUrgent, predictedViewTop, smoothedVelocity } from './nearest'
+import { previewUrl } from './previews'
 
 /**
  * Makes sure a photo is already in the browser by the time a guest scrolls to it.
  *
  * Browsers hold lazy photos back until they are close to the screen, which is the
- * right default for a slow page and the wrong one for a fast scroll. Once the
- * doors have opened this brings every lazy photo forward, a few at a time, always
- * the one nearest below the screen next, so a guest who scrolls fast is never
- * left with the far end of the page loading while the near end is still empty. It works on the real <img> elements, so it fetches exactly
- * the size the page would have chosen, and covers photos that come from the
- * database as well as the ones in the code.
+ * right default for a slow page and the wrong one for a fast scroll. This brings
+ * every lazy photo forward a few at a time, always the one nearest where the guest
+ * is heading next (it looks further ahead the faster they scroll), and gives the
+ * nearest ones a high network priority. Until a photo arrives it shows a tiny
+ * blurred copy of itself. It works on the real <img> elements, so it fetches
+ * exactly the size the page would have chosen, and covers photos that come from
+ * the database as well as the ones in the code.
  */
 
-/** Marks a photo that is not in yet, so the page can show a soft tint instead of a hole. */
+/** Marks a photo that is not in yet, so the page can show its preview instead of a hole. */
 export const PENDING_ATTRIBUTE = 'data-photo-pending'
-/** Set on the page, and announced, once every photo that was waiting has arrived. The 3D engine starts then. */
+/** The CSS variable that holds a photo's tiny preview while it is pending. */
+export const PREVIEW_VARIABLE = '--photo-preview'
+/** Set on the page, and announced, once every photo that was waiting has arrived. */
 export const PHOTOS_SETTLED_EVENT = 'wedding-photos-settled'
-const CONCURRENCY = 3
+const CONCURRENCY = 4
 const GIVE_UP_MS = 20000
-/** How far ahead of the screen (in screens) a photo is pulled in at once. */
-export const LOOK_AHEAD_SCREENS = 3
+/** Photos within this many screens are taken at once, past the queue. */
+export const LOOK_AHEAD_SCREENS = 1
 
 type LazyPhoto = HTMLImageElement
+
+export interface PhotoWarmer {
+  /** Resolves once the `count` photos nearest the top have arrived (or all of them, if fewer). */
+  firstSettled: (count: number) => Promise<void>
+  stop: () => void
+}
 
 const isPending = (photo: LazyPhoto): boolean => photo.hasAttribute(PENDING_ATTRIBUTE)
 
@@ -55,29 +65,54 @@ function announceSettled(): void {
 }
 
 /** Brings one photo forward and decodes it, so it paints with no delay when it arrives. */
-async function bringForward(photo: LazyPhoto): Promise<void> {
+async function bringForward(photo: LazyPhoto, urgent: boolean): Promise<void> {
+  photo.fetchPriority = urgent ? 'high' : 'low'
   if (photo.loading !== 'eager') photo.loading = 'eager'
   await settled(photo)
-  try { await photo.decode() } catch { /* a broken photo keeps its tint, nothing else to do */ }
+  try { await photo.decode() } catch { /* a broken photo keeps its preview, nothing else to do */ }
   photo.removeAttribute(PENDING_ATTRIBUTE)
+  photo.style.removeProperty(PREVIEW_VARIABLE)
 }
 
-/** Starts warming. Safe to call again: the page is only watched once. Returns a function that stops it. */
-export function startPhotoWarmer(): () => void {
-  if (typeof window === 'undefined' || document.documentElement.dataset.photosWarming === 'true') return () => undefined
-  document.documentElement.dataset.photosWarming = 'true'
+const noopWarmer: PhotoWarmer = { firstSettled: () => Promise.resolve(), stop: () => undefined }
+let current: PhotoWarmer | null = null
+
+/** Starts warming. Safe to call again: the page is only watched once and the same handle is returned. */
+export function startPhotoWarmer(): PhotoWarmer {
+  if (typeof window === 'undefined') return noopWarmer
+  if (current) return current
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection
-  if (connection?.saveData) { announceSettled(); return () => undefined }
+  if (connection?.saveData) { announceSettled(); current = noopWarmer; return current }
 
   const queued = new Set<LazyPhoto>()
   const waiting = new Set<LazyPhoto>()
+  const firstWaiters: { count: number; resolve: () => void }[] = []
   let active = 0
   let inFlight = 0
+  let arrived = 0
   let stopped = false
+
+  const releaseWaiters = () => {
+    for (const waiter of [...firstWaiters]) {
+      if (arrived >= Math.min(waiter.count, queued.size)) { waiter.resolve(); firstWaiters.splice(firstWaiters.indexOf(waiter), 1) }
+    }
+  }
   const checkSettled = () => { if (!stopped && waiting.size === 0 && active === 0 && inFlight === 0) announceSettled() }
-  const fetchPhoto = async (photo: LazyPhoto) => {
-    inFlight++
-    try { await bringForward(photo) } finally { inFlight--; checkSettled() }
+
+  // How fast and which way the guest is scrolling, so the queue can look ahead of them.
+  let velocity = 0
+  let lastY = window.scrollY
+  let lastAt = performance.now()
+  const onScroll = () => {
+    const now = performance.now()
+    velocity = smoothedVelocity(velocity, window.scrollY - lastY, now - lastAt, 0)
+    lastY = window.scrollY
+    lastAt = now
+  }
+  window.addEventListener('scroll', onScroll, { passive: true })
+  const view = () => {
+    const speed = performance.now() - lastAt > 150 ? 0 : velocity
+    return { top: predictedViewTop(window.scrollY, speed), direction: (speed < 0 ? -1 : 1) as 1 | -1 }
   }
 
   const rangeOf = (photo: LazyPhoto) => {
@@ -85,12 +120,21 @@ export function startPhotoWarmer(): () => void {
     return { top: box.top + window.scrollY, bottom: box.bottom + window.scrollY }
   }
 
-  // Each worker takes whichever waiting photo is nearest the screen right now, so the order follows the guest.
+  const fetchPhoto = async (photo: LazyPhoto) => {
+    inFlight++
+    const ahead = view()
+    const { top, bottom } = rangeOf(photo)
+    try { await bringForward(photo, isUrgent(distanceFromView(top, bottom, ahead.top, window.innerHeight, ahead.direction), window.innerHeight)) }
+    finally { inFlight--; arrived++; releaseWaiters(); checkSettled() }
+  }
+
+  // Each worker takes whichever waiting photo is nearest where the guest is heading, so the order follows them.
   const work = async () => {
     active++
     try {
       while (!stopped) {
-        const photo = closestToView(waiting, rangeOf, window.scrollY, window.innerHeight)
+        const ahead = view()
+        const photo = closestToView(waiting, rangeOf, ahead.top, window.innerHeight, ahead.direction)
         if (!photo) return
         waiting.delete(photo)
         if (isPending(photo)) await fetchPhoto(photo)
@@ -101,7 +145,7 @@ export function startPhotoWarmer(): () => void {
   }
   const kick = () => { while (active < CONCURRENCY && waiting.size > 0 && !stopped) void work() }
 
-  // A photo that comes within a few screens is taken at once, past the queue.
+  // A photo that comes within a screen is taken at once, past the queue.
   const near = new IntersectionObserver(entries => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue
@@ -118,10 +162,13 @@ export function startPhotoWarmer(): () => void {
       queued.add(photo)
       waiting.add(photo)
       photo.setAttribute(PENDING_ATTRIBUTE, '')
+      const preview = previewUrl(photo.getAttribute('src') ?? '')
+      if (preview) photo.style.setProperty(PREVIEW_VARIABLE, `url("${preview}")`)
       near.observe(photo)
     }
     kick()
     checkSettled()
+    releaseWaiters()
   }
 
   enqueue()
@@ -133,12 +180,17 @@ export function startPhotoWarmer(): () => void {
   })
   watcher.observe(document.body, { childList: true, subtree: true })
 
-  return () => {
-    stopped = true
-    near.disconnect()
-    watcher.disconnect()
-    window.clearTimeout(pending)
-    delete document.documentElement.dataset.photosWarming
-    delete document.documentElement.dataset.photosSettled
+  current = {
+    firstSettled: count => new Promise(resolve => { firstWaiters.push({ count, resolve }); releaseWaiters() }),
+    stop: () => {
+      stopped = true
+      near.disconnect()
+      watcher.disconnect()
+      window.removeEventListener('scroll', onScroll)
+      window.clearTimeout(pending)
+      firstWaiters.splice(0).forEach(waiter => waiter.resolve())
+      current = null
+    },
   }
+  return current
 }
